@@ -208,3 +208,16 @@ details.setup code{background:#0c1526;padding:1px 5px;border-radius:5px;font-siz
 @media(max-width:800px){.stores{grid-template-columns:1fr}
 }
 
+
+.lbl{font-size:13px;color:#b8c5d8}
+.tin{display:grid;gap:6px;margin-top:6px}.tin-f{display:flex;align-items:center;gap:6px}.tin-f input{width:74px;margin:0}.tin-f small{margin-right:6px}
+.tin-r{width:100%;margin:2px 0 0;padding:0;border:0;background:none;accent-color:#3477eb;height:22px}
+.tin-scale{display:flex;justify-content:space-between;font-size:11px;color:#6f7f98;margin-top:-4px}
+.tin.compact{margin:0}.tin.compact .tin-f input{width:58px;padding:7px 6px}
+.partrow{grid-template-columns:1fr 70px 118px auto!important}.partrow .pname{grid-column:1;grid-row:1}.partrow>label:nth-child(2){grid-column:2;grid-row:1}.partrow .pcost{grid-column:3;grid-row:1}.partrow>div:last-child{grid-column:4;grid-row:1}.partrow .ptime{grid-column:1/3;grid-row:2}.partrow .ptime .tin{grid-template-columns:auto 1fr;align-items:center;gap:14px;margin-top:4px}
+.protorow{grid-template-columns:28px 1fr 90px auto auto!important}
+.colors{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.cchip{display:inline-flex;align-items:center;gap:6px;background:#0d1729;border:1px solid #29364a;color:#dbe4f2;padding:6px 10px 6px 7px;border-radius:20px;font-size:12.5px}.cchip:hover{border-color:#3e5378}.cchip.on{border-color:#3477eb;background:#16264a}
+.colcustom{display:grid;grid-template-columns:1fr 54px auto;gap:8px;margin-top:10px}.colcustom input{margin:0}.colcustom input[type=color]{height:43px;padding:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.tagchip{display:inline-flex;align-items:center;gap:6px;background:#0d1729;border:1px solid #29364a;border-radius:20px;padding:4px 10px;font-size:12.5px}
+.tabwarn{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:20;background:#4a3d22;color:#f3d39b;border:1px solid #7a6330;border-radius:10px;padding:10px 14px;font-size:13px;max-width:92vw;box-shadow:0 6px 24px #0008}
+@media(max-width:800px){.partrow{grid-template-columns:1fr 1fr!important}.partrow>*{grid-column:auto!important;grid-row:auto!important}.partrow .pname,.partrow .ptime{grid-column:1/-1!important}.partrow .ptime .tin{grid-template-columns:1fr}.protorow{grid-template-columns:28px 1fr 1fr!important}.protorow .tin{grid-column:2/-1}}

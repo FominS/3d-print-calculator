@@ -88,7 +88,7 @@ window.GDrive = (() => {
     return r;
   }
   const q = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  async function list(parent, extra = '', fields = 'files(id,name,modifiedTime,version)') {
+  async function list(parent, extra = '', fields = 'files(id,name,modifiedTime,version,md5Checksum)') {
     const query = `'${parent}' in parents and trashed=false${extra}`;
     let out = [], page = '';
     do {
@@ -99,7 +99,7 @@ window.GDrive = (() => {
     return out;
   }
   const findOne = async (parent, name, folder) => (await list(parent, ` and name='${q(name)}'` + (folder ? ` and mimeType='${FOLDER}'` : '')))[0] || null;
-  const meta = async id => (await api(`${API}/files/${id}?fields=id,name,modifiedTime,version,trashed`)).json();
+  const meta = async id => (await api(`${API}/files/${id}?fields=id,name,modifiedTime,version,md5Checksum,trashed`)).json();
   const mkdir = async (parent, name) => (await api(`${API}/files?fields=id`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: FOLDER, parents: [parent] }),
@@ -108,16 +108,16 @@ window.GDrive = (() => {
     const fd = new FormData();
     fd.append('metadata', new Blob([JSON.stringify({ name, parents: [parent] })], { type: 'application/json' }));
     fd.append('file', blob);
-    return (await api(`${UPLOAD}/files?uploadType=multipart&fields=id,name,modifiedTime,version`, { method: 'POST', body: fd })).json();
+    return (await api(`${UPLOAD}/files?uploadType=multipart&fields=id,name,modifiedTime,version,md5Checksum`, { method: 'POST', body: fd })).json();
   }
-  const update = async (id, blob) => (await api(`${UPLOAD}/files/${id}?uploadType=media&fields=id,name,modifiedTime,version`, {
+  const update = async (id, blob) => (await api(`${UPLOAD}/files/${id}?uploadType=media&fields=id,name,modifiedTime,version,md5Checksum`, {
     method: 'PATCH', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob,
   })).json();
   const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
 
   /* ---------- Хранилище (тот же интерфейс, что у папки на компьютере) ---------- */
   function store() {
-    let ids = null, knownVersion = null, photoIdsPromise = null;
+    let ids = null, knownMd5 = null, photoIdsPromise = null;
     const saveIds = () => ls.set(IDS_KEY, JSON.stringify(ids));
     async function alive(id) {
       if (!id) return false;
@@ -157,7 +157,7 @@ window.GDrive = (() => {
         const m = await dataMeta();
         if (!m) return null;
         const text = (await (await api(`${API}/files/${m.id}?alt=media`)).text()).trim();
-        knownVersion = m.version;
+        knownMd5 = m.md5Checksum || null;
         return text ? { name: DATA_NAME, text, modified: new Date(m.modifiedTime) } : null;
       },
       async write(text) {
@@ -166,12 +166,14 @@ window.GDrive = (() => {
         let m = null;
         if (ids.data) m = await update(ids.data, blob).catch(e => { if (e.status === 404) return null; throw e; });
         if (!m) { m = await create(ids.root, DATA_NAME, blob); ids.data = m.id; saveIds(); }
-        knownVersion = m.version;
+        knownMd5 = m.md5Checksum || null;
       },
-      // true, если файл данных изменили с другого устройства после нашего последнего чтения/записи
+      // true, если СОДЕРЖИМОЕ файла данных изменили с другого устройства после нашего последнего чтения/записи.
+      // Сравниваем md5 содержимого, а не version: version в Google Drive растёт и без изменения данных.
       async remoteChanged() {
-        if (!knownVersion || !ids?.data) return false;
-        return (await meta(ids.data)).version !== knownVersion;
+        if (!knownMd5 || !ids?.data) return false;
+        const m = await meta(ids.data);
+        return !!m.md5Checksum && m.md5Checksum !== knownMd5;
       },
       async backup(text) {
         await create(await sub('backups', BACKUP_DIR), `3d-print-data_${stamp()}.json`, new Blob([text], { type: 'application/json' }));
