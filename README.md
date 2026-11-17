@@ -1,115 +1,110 @@
 # 3D Print Calculator
 
-A lightweight, browser-based 3D printing cost calculator and print tracking tool. Calculate the actual cost of your 3D prints, manage materials, and keep a record of printed models.
+A browser-based 3D printing cost calculator and print tracker for hobbyists. Calculate the real cost of a print, keep a catalog of your models, track filament spools and log every print. No backend, no account: your data stays in your browser, in a folder on your computer or in your own Google Drive.
 
-Designed for hobbyists, makers, and small-scale 3D printing enthusiasts.
+**Live:** https://fomins.github.io/3d-print-calculator/
+
+Interface language: Russian. Originally built for a Bambu Lab P2S Combo, works with any FDM printer.
 
 ## Features
 
-- **Cost Calculator** — Calculate printing costs based on filament consumption, electricity usage, printer depreciation, and maintenance.
-- **Print Catalog** — Save, edit, search, and manage printed models.
-- **Filament Management** — Configure different filament types and their prices per kilogram.
-- **Printer Settings** — Customize printer price, expected lifespan, annual printing hours, and power consumption.
-- **Cost Breakdown** — View detailed expenses for each print.
-- **Local Data Storage** — Keep your data in the browser without requiring an account.
-- **Import & Export** — Back up and restore your data using JSON files.
-- **CSV Export** — Export your print catalog for further analysis.
-- **No Backend Required** — Runs entirely in the browser.
+- **Cost calculator**: filament, electricity, printer depreciation, maintenance and extra costs, with a per-factor breakdown.
+- **Item catalog** with a page per item:
+  - links (MakerWorld, Printables, etc.), status, tags, notes, print settings, photos;
+  - **parts**: quantity, print time and several filaments per part (AMS multicolor);
+  - **prototypes**: test prints are tracked separately as development cost;
+  - **MakerWorld description generator** (RU/EN) built from parts and print settings.
+- **Filament spools**: brand, series, color, price, remaining amount in grams and meters, low-stock warning. Correct the remaining amount manually or by weighing the spool. The empty spool weight is derived from a new sealed spool.
+- **Print log**: each print deducts filament from the selected spools, and failed prints are recorded too.
+- **Statistics**: totals, averages, cost structure, by material and by month.
+- **Storage**: browser (always), a local folder (Chrome/Edge desktop) or Google Drive (any device, including phones).
+- **Import/export**: JSON backup, CSV export.
 
-## Cost Calculation
+## Cost formula
 
-The total printing cost is calculated using:
-
-\[
-C = \frac{M \times P}{1000} + T \times W \times E + T \times A + T \times R
-\]
-
-Where:
+```
+C = M × P / 1000 + T × W / 1000 × E + T × A + T × R + X
+A = Printer price / (Lifespan in years × Printing hours per year)
+```
 
 | Variable | Description |
 |---|---|
-| C | Total printing cost |
-| M | Filament consumption (g) |
-| P | Filament price per kilogram |
-| T | Printing time (hours) |
-| W | Average printer power consumption (kW) |
+| M | Filament used, g (including supports and waste) |
+| P | Filament price per kg |
+| T | Print time, h |
+| W | Average printer power, W |
 | E | Electricity price per kWh |
-| A | Printer depreciation cost per hour |
-| R | Maintenance cost per hour |
+| A | Depreciation per print hour |
+| R | Maintenance per print hour |
+| X | Extra costs |
 
-Printer depreciation is calculated as:
+Labor and profit are not included.
 
-\[
-A = \frac{\text{Printer Price}}{\text{Expected Lifespan (Years)} \times \text{Annual Printing Hours}}
-\]
+## Data storage
 
-## Getting Started
+| Storage | Where | Devices | Photos |
+|---|---|---|---|
+| Browser | IndexedDB of the current browser | this browser only | — |
+| Folder | `3d-print-data.json`, `photos/`, `backups/` in a folder you pick | Chrome/Edge on desktop | ✓ |
+| Google Drive | `3D Print Calculator/` folder in your Drive | any browser | ✓ |
 
-### Online
+- The browser copy is always kept. The selected storage is synced automatically (can be switched to manual, `Ctrl+S`).
+- Before overwriting a data file, the previous version is saved to `backups/`.
+- With Google Drive, changes made on another device are picked up when you return to the tab. If both sides changed, you choose which version to keep, and the other one goes to `backups/`.
+- The site never sends your data anywhere except the storage you choose.
 
-Open the application using GitHub Pages once deployed.
+> Browser data is tied to the site address. If you used the calculator from a local file before, open **Settings → Folder**, pick the folder with your `3d-print-data.json`, and the data will be loaded.
 
-### Local Installation
+## Google Drive setup
 
-1. Clone the repository:
+Google requires an OAuth Client ID for the site that accesses Drive. This takes about 5 minutes and is done once.
 
-   `git clone https://github.com/YOUR_USERNAME/3d-print-calculator.git`
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project.
+2. **APIs & Services → Library**: enable **Google Drive API**.
+3. **OAuth consent screen**: choose *External*, fill in the app name and your email, and add yourself under **Test users**.
+4. **Credentials → Create credentials → OAuth client ID → Web application**:
+   - *Authorized JavaScript origins*: `https://fomins.github.io` (plus `http://localhost:8000` for local testing).
+5. Copy the **Client ID** into `js/config.js` (`googleClientId`), or paste it in **Settings → Google Drive → Google Client ID**.
+6. In the app: **Settings → Connect Google Drive**.
 
-2. Open `index.html` in your browser.
+The app uses the `drive.file` scope, so it can only see files it created itself and has no access to the rest of your Drive. The Client ID is public by design. Google only accepts it from the origins listed above.
 
-3. Configure your printer, materials, and electricity costs.
+Sign-in tokens last about an hour. After that, the app asks you to sign in again with one click, and your changes in the meantime are kept in the browser and synced after sign-in.
 
-4. Start calculating and saving your prints.
+## Running
 
-No installation, server, or additional dependencies are required.
+**Online:** GitHub Pages. In the repository settings, go to **Pages → Deploy from a branch → `main` / root**.
 
-## Data Storage
+**Locally:** serve the folder over HTTP (Google sign-in does not work from `file://`):
 
-The application stores data locally in your browser.
+```
+python -m http.server 8000
+```
 
-- Data is automatically saved between sessions.
-- Export your data to JSON for backup.
-- Import previously exported data.
-- Export your print catalog to CSV.
+Then open http://localhost:8000.
 
-**Important:** Browser storage is device-specific. Data is not automatically synchronized between devices. Regular JSON backups are recommended.
+## Project structure
 
-## Compatibility
+```
+index.html            markup
+css/style.css         styles
+js/config.js          settings (Google Client ID)
+js/gdrive.js          Google Drive storage
+js/app.js             application
+manifest.webmanifest  install as an app on a phone/desktop
+```
 
-The calculator works with most FDM/FFF 3D printers, including:
+Personal data files (`3d-print-data*.json`, `photos/`, `backups/`) are listed in `.gitignore` and are never committed.
 
-- Bambu Lab
-- Prusa
-- Creality
-- Anycubic
-- Elegoo
-- Other FDM printers
+## Planned
 
-Originally developed with the Bambu Lab P2S Combo in mind.
-
-## Planned Features
-
-- [ ] Detailed print history and statistics
-- [ ] Filament spool inventory and remaining weight tracking
-- [ ] Import printing data from Bambu Studio
-- [ ] Support for multiple printers
-- [ ] Print photos and model attachments
-- [ ] Cloud synchronization
-- [ ] User authentication
-- [ ] Advanced cost analytics
-
-## Technology
-
-- HTML
-- CSS
-- JavaScript
-- Browser Local Storage
-- GitHub Pages
+- [ ] Import grams and print time from Bambu Studio `.gcode.3mf`
+- [ ] Hardware/consumables catalog (screws, magnets, inserts) with prices
+- [ ] Printer maintenance schedule by print hours
+- [ ] Failure rate allowance and "price for friends" markup
+- [ ] Spool labels with QR codes, Spoolman import/export
+- [ ] Multiple printers
 
 ## License
 
-No license has been specified yet.
-
----
-
-Made for makers who want to understand and track the real cost of 3D printing.
+See [LICENSE](LICENSE).

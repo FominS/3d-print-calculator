@@ -1,0 +1,11 @@
+# Личные данные приложения — не публикуются
+3d-print-data*.json
+photos/
+backups/
+
+# Служебные файлы ОС и редакторов
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
