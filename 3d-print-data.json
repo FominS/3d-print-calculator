@@ -1,0 +1,75 @@
+{
+  "version": 2,
+  "updatedAt": "2026-11-15T23:47:12.478Z",
+  "settings": {
+    "printerName": "Bambu Lab P2S",
+    "printerPrice": 76990,
+    "years": 5,
+    "annualHours": 500,
+    "watts": 120,
+    "tariff": 7.24,
+    "maintenance": 3
+  },
+  "materials": [
+    {
+      "id": "petg",
+      "name": "PETG",
+      "price": 1090
+    },
+    {
+      "id": "pla",
+      "name": "PLA",
+      "price": 1190
+    },
+    {
+      "id": "abs",
+      "name": "ABS",
+      "price": 1200
+    }
+  ],
+  "items": [
+    {
+      "id": "4e9a254d-a9ff-4a7d-afe0-55f031eae4e5",
+      "name": "iphone duo",
+      "status": "done",
+      "tags": [],
+      "createdAt": "2026-11-15T22:18:50.751Z",
+      "updatedAt": "2026-11-15T22:18:50.751Z",
+      "extra": 0,
+      "notes": "",
+      "links": [],
+      "print": {
+        "nozzle": "0.4",
+        "layer": "0.2",
+        "infill": "",
+        "walls": "",
+        "supports": "",
+        "plate": "",
+        "other": ""
+      },
+      "desc": {
+        "lang": "ru",
+        "intro": "",
+        "hardware": "",
+        "assembly": "",
+        "tips": ""
+      },
+      "photos": [],
+      "cover": "",
+      "parts": [
+        {
+          "id": "9fa42b2391",
+          "name": "Изделие целиком",
+          "qty": 1,
+          "hours": 4.5,
+          "filaments": [
+            {
+              "materialId": "pla",
+              "grams": 97
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
