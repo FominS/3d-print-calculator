@@ -57,7 +57,11 @@ Labor and profit are not included.
 
 ## Google Drive setup
 
-Google requires an OAuth Client ID for the site that accesses Drive. This takes about 5 minutes and is done once.
+Google requires an OAuth Client ID for the site that accesses Drive. It is done once.
+
+**Detailed step-by-step guide (in Russian) with screenshots-level detail and troubleshooting: [docs/google-drive-setup.md](docs/google-drive-setup.md).**
+
+Short version:
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project.
 2. **APIs & Services → Library**: enable **Google Drive API**.

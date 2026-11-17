@@ -6,5 +6,5 @@
  * Можно оставить пустым и ввести Client ID в «Настройки → Google Drive».
  */
 window.APP_CONFIG = {
-  googleClientId: '',
+  googleClientId: '984582520695-hsn10g8vof1lojvqc5l6k19hcqic1ukf.apps.googleusercontent.com',
 };
