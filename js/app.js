@@ -291,13 +291,13 @@ function renderItem(){const it=item();if(!it)return;
   $('itMeta').innerHTML=`<span class="pill ${it.status}">${STATUSES[it.status]}</span> · создано ${escape((it.createdAt||'').slice(0,10))}${it.updatedAt?' · изменено '+escape(new Date(it.updatedAt).toLocaleString('ru-RU')):''}`;
   $('itPrinter').innerHTML=printerOptions(it.printerId);
   $('page-item').querySelectorAll('[data-f]').forEach(el=>{const v=getPath(it,el.dataset.f);el.value=el.dataset.f==='tags'?it.tags.join(', '):(v??'')});
-  renderLinks();renderParts();renderItemPrints();$('printForm').hidden=true;$('printStartBtn').hidden=false;renderProtos();renderItemCalc();renderPhotos();renderDesc()}
+  renderLinks();renderParts();renderItemPrints();if(printFormFor===it.id&&!$('printForm').hidden)buildPfRows(true);else closePrintForm();renderProtos();renderItemCalc();renderPhotos();renderDesc()}
 function renderLinks(){const it=item();$('itLinks').innerHTML=it.links.length?it.links.map((l,i)=>{const u=safeUrl(l.url);return`<div class="linkrow"><input class="ltitle" data-li="${i}" data-lf="title" value="${escape(l.title)}" placeholder="Название (MakerWorld, Printables...)"><input data-li="${i}" data-lf="url" value="${escape(l.url)}" placeholder="https://makerworld.com/... или thingiverse.com/..."><a ${u?`href="${escape(u)}"`:''} target="_blank" rel="noopener" title="Открыть" data-lopen="${i}" style="${u?'':'opacity:.3'}">↗</a><button class="iconbtn danger" data-act="delLink" data-li="${i}" title="Удалить">×</button></div>`}).join(''):'<p class="muted" style="margin-top:0">Ссылок пока нет.</p>'}
 function renderParts(){const it=item();
   $('itParts').innerHTML=it.parts.map(p=>`<div class="part" data-pid="${escape(p.id)}"><div class="partrow"><label class="pname">Элемент<input data-pid="${escape(p.id)}" data-pf="name" value="${escape(p.name)}" placeholder="Основание, крышка..."></label><label>Кол-во<input data-pid="${escape(p.id)}" data-pf="qty" type="number" min="1" step="1" value="${p.qty}"></label><div class="lbl ptime">Время на 1 шт${tin(`data-pid="${escape(p.id)}" data-pf="hours"`,p.hours)}</div><div class="pcost" data-pcost="${escape(p.id)}"></div><div style="display:flex;gap:6px;padding-bottom:2px"><button class="iconbtn" data-act="dupPart" data-pid="${escape(p.id)}" title="Дублировать элемент">⧉</button><button class="iconbtn danger" data-act="delPart" data-pid="${escape(p.id)}" title="Удалить элемент">×</button></div></div>
     ${p.filaments.map((f,i)=>`<div class="filrow"><span class="lead">└</span><select data-pid="${escape(p.id)}" data-fi="${i}" data-ff="materialId">${matOptions(f.materialId)}</select><input data-pid="${escape(p.id)}" data-fi="${i}" data-ff="grams" type="number" min="0" step="0.1" value="${f.grams}" title="Граммы на 1 шт"><button class="iconbtn danger" data-act="delFil" data-pid="${escape(p.id)}" data-fi="${i}" title="Убрать материал" ${p.filaments.length<2?'disabled':''}>×</button></div>`).join('')}
     <div class="filrow"><span class="lead"></span><button class="secondary" style="justify-self:start;padding:6px 10px;font-size:12.5px" data-act="addFil" data-pid="${escape(p.id)}">+ материал (AMS)</button></div></div>`).join('')||'<p class="muted">Добавьте хотя бы один элемент.</p>'}
-function renderProtos(){const it=item();$('itProtos').innerHTML=it.prototypes.length?`<div class="tablewrap"><table class="mini proto"><thead><tr><th>Версия</th><th>Дата</th><th>Материал</th><th class="num">Граммы</th><th>Время</th><th class="num">Стоимость</th><th>Катушка</th><th>Что проверяли / что изменили</th><th></th></tr></thead><tbody>${it.prototypes.map(p=>{const a=`data-pr="${escape(p.id)}"`;return`<tr><td><input ${a} data-prf="name" value="${escape(p.name)}" style="width:70px"></td><td><input ${a} data-prf="date" type="date" value="${escape(p.date)}" style="width:140px"></td><td><select ${a} data-prf="materialId" style="min-width:90px">${matOptions(p.materialId)}</select></td><td><input ${a} data-prf="grams" type="number" min="0" step="0.1" value="${p.grams}" style="width:80px"></td><td>${tin(`${a} data-prf="hours"`,p.hours,{slider:false,compact:true})}</td><td class="num" data-prcost="${escape(p.id)}"></td><td><select ${a} data-prf="spoolId" style="min-width:150px">${spoolOptions(p.materialId,p.spoolId)}</select></td><td><input ${a} data-prf="note" value="${escape(p.note)}" placeholder="допуск 0.2 мало, увеличил"></td><td><button class="iconbtn danger" data-act="delProto" data-pr="${escape(p.id)}" title="Удалить">×</button></td></tr>`}).join('')}</tbody></table></div>`:'<p class="muted" style="margin:0">Пробных печатей пока нет.</p>'}
+function renderProtos(){const it=item();$('itProtos').innerHTML=it.prototypes.length?`<div class="tablewrap"><table class="mini proto"><thead><tr><th>Версия</th><th>Дата</th><th>Материал</th><th class="num">Граммы</th><th>Время</th><th class="num">Стоимость</th><th>Катушка</th><th>Что проверяли / что изменили</th><th></th></tr></thead><tbody>${it.prototypes.map(p=>{const a=`data-pr="${escape(p.id)}"`;return`<tr><td><input ${a} data-prf="name" value="${escape(p.name)}" style="width:70px"></td><td><input ${a} data-prf="date" type="date" value="${escape(p.date)}" style="width:140px"></td><td><select ${a} data-prf="materialId" style="min-width:90px">${matOptions(p.materialId)}</select></td><td><input ${a} data-prf="grams" type="number" min="0" step="0.1" value="${p.grams}" style="width:80px"></td><td>${tin(`${a} data-prf="hours"`,p.hours,{slider:false,compact:true})}</td><td class="num" data-prcost="${escape(p.id)}"></td><td><select ${a} data-prf="spoolId" style="min-width:150px">${spoolOptions(p.materialId,p.spoolId)}</select></td><td><input ${a} data-prf="note" value="${escape(p.note)}" placeholder="допуск 0.2 мало, увеличил"></td><td><button class="iconbtn danger" data-act="delProto" data-pr="${escape(p.id)}" title="Удалить">×</button></td></tr>`}).join('')}</tbody></table></div>`:'<p class="muted" style="margin:0">Пробных печатей пока нет.</p>';$('itProtos').querySelectorAll('select[data-prf="spoolId"]').forEach(spoolPick)}
 function renderItemCalc(){const it=item();if(!it)return;const c=calcItem(it);
   $('itTotal').textContent=money(c.total);
   $('itSummary').textContent=`${fmt(c.grams)} г · ${fmtH(c.hours)} · элементов: ${it.parts.length}${c.pieces!==it.parts.length?` (${c.pieces} шт)`:''}${c.grams?` · ${money(c.total/c.grams)}/г`:''}`;
@@ -336,9 +336,9 @@ $('page-item').addEventListener('input',e=>{const it=item(),el=e.target;if(!it)r
   else if(el.dataset.prf){const p=it.prototypes.find(x=>x.id===el.dataset.pr);if(!p)return;const k=el.dataset.prf;p[k]=['grams','hours'].includes(k)?number(el.value):el.value;if(k==='materialId'){p.spoolId='';renderProtos()}if(k==='spoolId'||k==='grams'||k==='date'){const s=getSpool(p.spoolId);if(s&&s.status==='sealed')s.status='open';renderSpools()}}
   else if(el.dataset.lf){const l=it.links[+el.dataset.li];if(!l)return;l[el.dataset.lf]=el.value;if(el.dataset.lf==='url'){const t=el.parentElement.querySelector('[data-lf="title"]'),sn=siteName(el.value);if(sn&&(!l.title||SITES.some(([,n])=>n===l.title))){l.title=sn;t.value=sn}const a=el.parentElement.querySelector('[data-lopen]'),u=safeUrl(el.value);if(u)a.href=u;else a.removeAttribute('href');a.style.opacity=u?'':'.3'}}
   else return;
-  touch(it);schedulePersist();renderItemCalc();renderDesc()});
+  touch(it);schedulePersist();renderItemCalc();renderDesc();if(el.dataset.pf||el.dataset.ff)refreshPrintForm()});
 $('page-item').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const it=item();if(!it)return;const act=b.dataset.act,pid=b.dataset.pid,p=pid&&it.parts.find(x=>x.id===pid);
-  if(act==='printStart'){openPrintForm();return}if(act==='printCancel'){$('printForm').hidden=true;$('printStartBtn').hidden=false;return}if(act==='printSave'){savePrint();return}
+  if(act==='printStart'){openPrintForm();return}if(act==='printCancel'){closePrintForm();return}if(act==='printSave'){savePrint();return}
   if(act==='addLink'){it.links.push({title:b.dataset.preset||'',url:''});renderLinks();$('itLinks').querySelector('.linkrow:last-child [data-lf="url"]')?.focus()}
   else if(act==='delLink'){it.links.splice(+b.dataset.li,1);renderLinks()}
   else if(act==='addProto'){const last=it.prototypes.at(-1);it.prototypes.push({id:shortId(),name:'v'+(it.prototypes.length+1),date:now().slice(0,10),materialId:last?.materialId||it.parts[0]?.filaments[0]?.materialId||db.materials[0]?.id||'',grams:0,hours:0,note:'',spoolId:'',at:now()});renderProtos();$('itProtos').querySelector('tr:last-child [data-prf="grams"]')?.focus()}
@@ -353,7 +353,7 @@ $('page-item').addEventListener('click',async e=>{const b=e.target.closest('[dat
   else if(act==='dupItem'){const cp=structuredClone(it);cp.id=uid();cp.name=it.name+' (копия)';cp.photos=[];cp.cover='';cp.prototypes=[];cp.createdAt=cp.updatedAt=now();cp.parts.forEach(x=>x.id=shortId());db.items.unshift(cp);persist();renderList();setStatus('Создана копия изделия');go('item/'+cp.id);return}
   else if(act==='delItem'){if(!confirm(`Удалить изделие «${it.name}»?${it.photos.length?' Его фото тоже будут удалены из папки.':''}`))return;await removePhotoFiles(it.photos.map(x=>x.file));db.items=db.items.filter(x=>x!==it);persist();renderList();setStatus('Изделие удалено');go('catalog');return}
   else return;
-  touch(it);persist();renderList();renderItemCalc();renderDesc()});
+  touch(it);persist();renderList();renderItemCalc();renderDesc();if(/Part|Fil/.test(act))refreshPrintForm()});
 $('photoAdd').onclick=()=>$('photoInput').click();
 $('photoInput').onchange=async e=>{const it=item();try{if(it)await addPhotos(it,[...e.target.files])}catch(err){storeErr(err)}e.target.value=''};
 const drop=$('photoDrop');
@@ -534,6 +534,35 @@ libPanel.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
   else return;
   libChanged()});
 
+
+/* ================= Выпадающий список катушек с цветом =================
+   Обёртка над обычным <select>: select остаётся в DOM (скрыт) и хранит значение,
+   поэтому остальной код читает select.value как раньше. */
+function spickLabel(id){const s=getSpool(id);if(!s)return'<span class="swatch sm empty"></span><span class="spick-t muted">— не списывать —</span>';const r=spoolState(s).remaining;return`${swatch(s,'sm')}<span class="spick-t">${escape(spName(s))}</span><span class="spick-r">${fmt(r,0)} г</span>`}
+function spoolPick(sel){if(sel.dataset.spick)return;sel.dataset.spick='1';const wrap=document.createElement('div');wrap.className='spick';sel.before(wrap);wrap.append(sel);sel.hidden=true;
+  const btn=document.createElement('button');btn.type='button';btn.className='spick-btn';btn.setAttribute('aria-haspopup','listbox');btn.setAttribute('aria-expanded','false');wrap.append(btn);
+  const draw=()=>{btn.innerHTML=spickLabel(sel.value)+'<span class="spick-caret">▾</span>';btn.title=btn.textContent.replace('▾','').trim()};draw();
+  btn.onclick=()=>spickOpen&&spickOpen.btn===btn?closeSpick():openSpick(btn,sel,draw);
+  btn.onkeydown=e=>{if(!spickOpen&&['ArrowDown','ArrowUp','Enter',' '].includes(e.key)){e.preventDefault();openSpick(btn,sel,draw)}}}
+let spickOpen=null;
+function closeSpick(){if(!spickOpen)return;spickOpen.list.remove();spickOpen.btn.setAttribute('aria-expanded','false');spickOpen=null}
+function openSpick(btn,sel,draw){closeSpick();const opts=[...sel.options],low=number(db.settings.lowStock);
+  const list=document.createElement('div');list.className='spick-list';list.setAttribute('role','listbox');
+  list.innerHTML=opts.map((o,i)=>{const s=getSpool(o.value),r=s?spoolState(s).remaining:0;return`<div class="spick-opt${o.value===sel.value?' on':''}" role="option" data-i="${i}">${s?`${swatch(s)}<span class="spick-main"><b>${escape(spName(s))}</b><small>${escape(getMat(s.materialId).name)} · ${SPOOL_ST[s.status]}${s.store?' · '+escape(s.store):''}</small></span><span class="spick-r${s.status!=='empty'&&r<low?' low':''}">${fmt(r,0)} г<small>≈ ${fmt(toM(s,r),0)} м</small></span>`:'<span class="swatch empty"></span><span class="spick-main"><b>Не списывать</b><small>печать запишется без катушки</small></span>'}</div>`}).join('')+(opts.length<2?'<div class="spick-none">Нет катушек этого материала — добавьте в разделе «Катушки»</div>':'');
+  document.body.append(list);btn.setAttribute('aria-expanded','true');
+  const place=()=>{const r=btn.getBoundingClientRect(),w=Math.max(r.width,320),below=innerHeight-r.bottom;list.style.width=Math.min(w,innerWidth-16)+'px';list.style.left=Math.max(8,Math.min(r.left,innerWidth-Math.min(w,innerWidth-16)-8))+'px';
+    if(below<280&&r.top>below){list.style.top='';list.style.bottom=(innerHeight-r.top+4)+'px';list.style.maxHeight=Math.min(340,r.top-12)+'px'}else{list.style.bottom='';list.style.top=(r.bottom+4)+'px';list.style.maxHeight=Math.min(340,below-12)+'px'}};
+  place();let act=Math.max(0,opts.findIndex(o=>o.value===sel.value));
+  const hi=()=>{list.querySelectorAll('.spick-opt').forEach((el,i)=>el.classList.toggle('act',i===act));list.querySelector('.spick-opt.act')?.scrollIntoView({block:'nearest'})};hi();
+  const choose=i=>{if(sel.value!==opts[i].value){sel.value=opts[i].value;sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}))}draw();closeSpick();btn.focus()};
+  list.onmousedown=e=>e.preventDefault();list.onclick=e=>{const o=e.target.closest('.spick-opt');if(o)choose(+o.dataset.i)};
+  list.onmousemove=e=>{const o=e.target.closest('.spick-opt');if(o&&+o.dataset.i!==act){act=+o.dataset.i;hi()}};
+  spickOpen={list,btn,key:e=>{if(e.key==='Escape'){e.preventDefault();closeSpick();btn.focus()}else if(e.key==='ArrowDown'){e.preventDefault();act=Math.min(opts.length-1,act+1);hi()}else if(e.key==='ArrowUp'){e.preventDefault();act=Math.max(0,act-1);hi()}else if(e.key==='Enter'||e.key===' '){e.preventDefault();choose(act)}else if(e.key==='Tab')closeSpick()},place}}
+document.addEventListener('keydown',e=>{if(spickOpen)spickOpen.key(e)},true);
+document.addEventListener('mousedown',e=>{if(spickOpen&&!spickOpen.list.contains(e.target)&&!spickOpen.btn.contains(e.target))closeSpick()});
+document.addEventListener('scroll',e=>{if(spickOpen&&!spickOpen.list.contains(e.target))spickOpen.place()},true);
+window.addEventListener('resize',closeSpick);
+
 /* ================= Журнал печати ================= */
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const printGrams=p=>p.usage.reduce((a,u)=>a+u.grams,0);
@@ -561,10 +590,19 @@ function renderItemPrints(){const it=item();if(!it)return;const list=db.prints.f
   const ok=list.filter(p=>p.result==='ok').reduce((a,p)=>a+p.sets,0),fail=list.filter(p=>p.result==='fail').length;
   $('itPrintSum').textContent=list.length?`Напечатано комплектов: ${ok}${fail?` · неудачных печатей: ${fail}`:''}`:'Ещё не печаталось. Запись спишет пластик с катушек.';
   $('itPrints').innerHTML=list.length?`<div class="tablewrap"><table class="mini"><thead><tr><th>Дата</th><th class="num">Компл.</th><th>Результат</th><th class="num">Филамент</th><th class="num">Себестоимость</th><th>Катушки</th><th>Комментарий</th><th></th></tr></thead><tbody>${list.map(p=>printRow(p,false)).join('')}</tbody></table></div>`:''}
-function openPrintForm(){const it=item();$('pfPrinter').innerHTML=printerOptions(getPrinter(it.printerId).id,false);$('pfDate').value=today();$('pfSets').value=1;$('pfResult').value='ok';$('pfNote').value='';
-  const rows=[];for(const p of it.parts)for(const f of p.filaments)rows.push({label:`${p.name||'Элемент'}${p.qty>1?' ×'+p.qty:''}`,materialId:f.materialId,per:number(f.grams)*Math.max(1,p.qty)});
-  $('pfRows').innerHTML=rows.map((r,i)=>{const {list}=sortedSpools(r.materialId);return`<div class="pfrow" data-pfi="${i}" data-mat="${escape(r.materialId)}" data-label="${escape(r.label)}"><span>${escape(r.label)} <small>· ${escape(getMat(r.materialId).name)}</small></span><select data-pfspool>${spoolOptions(r.materialId,list[0]?.id||'')}</select><label class="inl"><input data-pfg data-per="${r.per}" type="number" min="0" step="0.1" value="${r.per}"> г</label></div>`}).join('')+(db.spools.length?'':'<p class="muted">Катушек ещё нет — добавьте их в разделе «Катушки», иначе печать запишется без списания.</p>');
-  $('printForm').hidden=false;$('printStartBtn').hidden=true}
+let printFormFor=null;
+// Строки списания строятся из элементов изделия. keep=true — перестроить с сохранением выбранных катушек и вручную изменённых граммов
+function buildPfRows(keep){const it=item();if(!it)return;const prev=new Map();
+  if(keep)$('pfRows').querySelectorAll('.pfrow').forEach(r=>{const g=r.querySelector('[data-pfg]');prev.set(r.dataset.key,{mat:r.dataset.mat,spool:r.querySelector('[data-pfspool]').value,grams:g.value,edited:!!g.dataset.edited})});
+  const n=Math.max(1,Math.round(number($('pfSets').value))||1),rows=[];
+  for(const p of it.parts)p.filaments.forEach((f,i)=>rows.push({key:p.id+':'+i,label:`${p.name||'Элемент'}${p.qty>1?' ×'+p.qty:''}`,materialId:f.materialId,per:number(f.grams)*Math.max(1,p.qty)}));
+  $('pfRows').innerHTML=rows.map(r=>{const pv=prev.get(r.key),same=pv&&pv.mat===r.materialId,{list}=sortedSpools(r.materialId),sp=same?pv.spool:(list[0]?.id||''),edited=same&&pv.edited,g=edited?pv.grams:Math.round(r.per*n*10)/10;
+    return`<div class="pfrow" data-key="${escape(r.key)}" data-mat="${escape(r.materialId)}" data-label="${escape(r.label)}"><span>${escape(r.label)} <small>· ${escape(getMat(r.materialId).name)}</small></span><select data-pfspool>${spoolOptions(r.materialId,sp)}</select><label class="inl"><input data-pfg data-per="${r.per}"${edited?' data-edited="1"':''} type="number" min="0" step="0.1" value="${g}"> г</label></div>`}).join('')+(db.spools.length?'':'<p class="muted">Катушек ещё нет — добавьте их в разделе «Катушки», иначе печать запишется без списания.</p>');
+  $('pfRows').querySelectorAll('select[data-pfspool]').forEach(spoolPick)}
+function openPrintForm(){const it=item();printFormFor=it.id;$('pfPrinter').innerHTML=printerOptions(getPrinter(it.printerId).id,false);$('pfDate').value=today();$('pfSets').value=1;$('pfResult').value='ok';$('pfNote').value='';
+  buildPfRows(false);$('printForm').hidden=false;$('printStartBtn').hidden=true}
+function closePrintForm(){printFormFor=null;$('printForm').hidden=true;$('printStartBtn').hidden=false}
+const refreshPrintForm=()=>{if(!$('printForm').hidden)buildPfRows(true)};
 $('pfSets').oninput=()=>{const n=Math.max(1,Math.round(number($('pfSets').value))||1);$('pfRows').querySelectorAll('[data-pfg]').forEach(el=>{if(!el.dataset.edited)el.value=Math.round(number(el.dataset.per)*n*10)/10})};
 $('pfRows').addEventListener('input',e=>{if(e.target.dataset.pfg!==undefined)e.target.dataset.edited='1'});
 function savePrint(){const it=item();const usage=[...$('pfRows').querySelectorAll('.pfrow')].map(r=>({label:r.dataset.label,materialId:r.dataset.mat,spoolId:r.querySelector('[data-pfspool]').value,grams:number(r.querySelector('[data-pfg]').value)})).filter(u=>u.grams>0);
@@ -572,7 +610,7 @@ function savePrint(){const it=item();const usage=[...$('pfRows').querySelectorAl
   for(const u of usage){const s=getSpool(u.spoolId);if(s&&s.status==='sealed'){s.status='open';s.opened||=p.date}}
   const empty=usage.map(u=>getSpool(u.spoolId)).filter(s=>s&&s.status!=='empty'&&spoolState(s).remaining<=0);
   if(empty.length&&confirm(`Катушка закончилась: ${empty.map(spName).join(', ')}. Отметить как закончившуюся?`))empty.forEach(s=>s.status='empty');
-  $('printForm').hidden=true;$('printStartBtn').hidden=false;persist();renderList();renderItemPrints();setStatus(`Печать записана, списано ${fmt(usage.filter(u=>u.spoolId).reduce((a,u)=>a+u.grams,0),1)} г`)}
+  closePrintForm();persist();renderList();renderItemPrints();setStatus(`Печать записана, списано ${fmt(usage.filter(u=>u.spoolId).reduce((a,u)=>a+u.grams,0),1)} г`)}
 $('itPrints').onclick=e=>{const id=e.target.dataset.delprint;if(id)delPrint(id)};
 
 /* ================= Прочие события ================= */
