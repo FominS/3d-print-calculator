@@ -1,24 +1,68 @@
 # 3D Print Calculator
 
-A browser-based 3D printing cost calculator and print tracker for hobbyists. Calculate the real cost of a print, keep a catalog of your models, track filament spools and log every print. No backend, no account: your data stays in your browser, in a folder on your computer or in your own Google Drive.
+**English** · [Русский](README.ru.md)
+
+A browser-based 3D printing cost calculator and print tracker for hobbyists. Calculate the real cost of a print, keep a catalog of your models, track filament spools and log every print. No backend and no account: your data stays in your browser, in a folder on your computer or in your own Google Drive.
 
 **Live:** https://fomins.github.io/3d-print-calculator/
 
-Interface language: Russian. Originally built for a Bambu Lab P2S Combo, works with any FDM printer.
+Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any FDM printer.
 
 ## Features
 
-- **Cost calculator**: filament, electricity, printer depreciation, maintenance and extra costs, with a per-factor breakdown.
-- **Item catalog** with a page per item:
-  - links (MakerWorld, Printables, etc.), status, tags, notes, print settings, photos;
-  - **parts**: quantity, print time and several filaments per part (AMS multicolor);
-  - **prototypes**: test prints are tracked separately as development cost;
-  - **MakerWorld description generator** (RU/EN) built from parts and print settings.
-- **Filament spools**: brand, series, color, price, remaining amount in grams and meters, low-stock warning. Correct the remaining amount manually or by weighing the spool. The empty spool weight is derived from a new sealed spool.
-- **Print log**: each print deducts filament from the selected spools, and failed prints are recorded too.
-- **Statistics**: totals, averages, cost structure, by material and by month.
-- **Storage**: browser (always), a local folder (Chrome/Edge desktop) or Google Drive (any device, including phones).
-- **Import/export**: JSON backup, CSV export.
+### Calculator
+- Cost breakdown: filament, electricity, printer depreciation, maintenance, extra costs.
+- Print time as hours + minutes with a 0–48 h slider. Decimal hours (`2.5`, `2,5`) and `2:30` are accepted too.
+- Printer selection and prototypes (test prints) counted separately as development cost.
+- Save to the catalog in one click and continue on the item page.
+
+### Item catalog and item page
+- Status (idea / in progress / done / published), tags, notes, printer, extra costs.
+- Links with one-click presets for MakerWorld, Thingiverse and Printables. Titles are detected from the URL.
+- **Parts**: quantity, print time and several filaments per part (AMS multicolor). Cost is shown per part and for the whole item.
+- **Prototypes**: version, date, filament, spool, time and a "what changed" note.
+- Print settings, photos (stored in the selected storage, resized to 1600 px) and a cover image.
+- **MakerWorld description generator** (RU/EN) built from parts and print settings.
+
+### Filament spools
+- Brand, series, color, net weight, diameter, price, store, purchase / opened / dried dates.
+- Remaining amount in grams and meters, a low-stock warning and spool history.
+- Correct the remaining amount manually (grams or meters) or by weighing the spool. The empty spool weight is derived from a new sealed spool.
+- **Libraries** in Settings:
+  - brands with their filament series;
+  - stores;
+  - color palette with **multicolor / rainbow** colors (gradients).
+- Quick picks in the spool form. New values are remembered automatically, and renaming a library entry updates the spools that use it.
+
+### Print log
+- "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
+- View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.
+
+### Statistics
+- Totals and averages, cost structure, by material, by month.
+- Prototype costs, filament in stock and printer wear by depreciation hours, per printer.
+
+### Printers
+- Several printers, each with price, lifespan, hours per year, power and maintenance cost. Bambu Lab P2S is the default.
+- The printer is chosen per item and per print.
+
+### Storage and sync
+
+| Storage | Where | Devices | Photos |
+|---|---|---|---|
+| Browser | IndexedDB of the current browser | this browser only | — |
+| Folder | `3d-print-data.json`, `photos/`, `backups/` in a folder you pick | Chrome / Edge on desktop | ✓ |
+| Google Drive | `3D Print Calculator/` folder in your Drive | any browser, including phones | ✓ |
+
+- The browser copy is always kept. The chosen storage is saved automatically, or manually with `Ctrl+S`.
+- Before overwriting a data file, the previous version goes to `backups/`.
+- Google Drive: changes from another device are picked up when you return to the tab, but never while you are typing. Real conflicts are detected by file content (MD5). You choose which version to keep, and the other one is backed up.
+- A warning is shown if the app is open in several tabs.
+
+### Other
+- Light and dark themes, or follow the system setting.
+- JSON backup / import, CSV export.
+- Installable as an app (web manifest).
 
 ## Cost formula
 
@@ -34,80 +78,67 @@ A = Printer price / (Lifespan in years × Printing hours per year)
 | T | Print time, h |
 | W | Average printer power, W |
 | E | Electricity price per kWh |
-| A | Depreciation per print hour |
-| R | Maintenance per print hour |
+| A | Depreciation per print hour (per printer) |
+| R | Maintenance per print hour (per printer) |
 | X | Extra costs |
 
-Labor and profit are not included.
+Prototypes use the same formula and are shown separately. Labor and profit are not included.
 
-## Data storage
+## Getting started
 
-| Storage | Where | Devices | Photos |
-|---|---|---|---|
-| Browser | IndexedDB of the current browser | this browser only | — |
-| Folder | `3d-print-data.json`, `photos/`, `backups/` in a folder you pick | Chrome/Edge on desktop | ✓ |
-| Google Drive | `3D Print Calculator/` folder in your Drive | any browser | ✓ |
+1. Open https://fomins.github.io/3d-print-calculator/.
+2. **Settings**: set filament prices, your printer(s) and the electricity rate.
+3. Choose a storage: a **folder** on your computer or **Google Drive**.
+4. Add spools under **Spools**, items through the **Calculator**, and log prints from the item page.
 
-- The browser copy is always kept. The selected storage is synced automatically (can be switched to manual, `Ctrl+S`).
-- Before overwriting a data file, the previous version is saved to `backups/`.
-- With Google Drive, changes made on another device are picked up when you return to the tab. If both sides changed, you choose which version to keep, and the other one goes to `backups/`.
-- The site never sends your data anywhere except the storage you choose.
-
-> Browser data is tied to the site address. If you used the calculator from a local file before, open **Settings → Folder**, pick the folder with your `3d-print-data.json`, and the data will be loaded.
+> Browser data is tied to the site address. If you used the calculator from a local file before, open **Settings → Folder** and pick the folder with your `3d-print-data.json`.
 
 ## Google Drive setup
 
-Google requires an OAuth Client ID for the site that accesses Drive. It is done once.
+Google needs an OAuth Client ID for the site. This is done once by the site owner.
 
-**Detailed step-by-step guide (in Russian) with screenshots-level detail and troubleshooting: [docs/google-drive-setup.md](docs/google-drive-setup.md).**
+**Step-by-step guide (in Russian) with troubleshooting: [docs/google-drive-setup.md](docs/google-drive-setup.md).**
 
 Short version:
 
-1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project.
-2. **APIs & Services → Library**: enable **Google Drive API**.
-3. **OAuth consent screen**: choose *External*, fill in the app name and your email, and add yourself under **Test users**.
-4. **Credentials → Create credentials → OAuth client ID → Web application**:
-   - *Authorized JavaScript origins*: `https://fomins.github.io` (plus `http://localhost:8000` for local testing).
-5. Copy the **Client ID** into `js/config.js` (`googleClientId`), or paste it in **Settings → Google Drive → Google Client ID**.
-6. In the app: **Settings → Connect Google Drive**.
+1. [Google Cloud Console](https://console.cloud.google.com/): create a project and enable **Google Drive API**.
+2. **Google Auth Platform**: audience *External*, add yourself to **Test users**.
+3. **Clients → Create client → Web application**, *Authorized JavaScript origins*: `https://fomins.github.io` (and `http://localhost:8000` for local testing).
+4. Put the Client ID into `js/config.js`, then commit and push.
 
-The app uses the `drive.file` scope, so it can only see files it created itself and has no access to the rest of your Drive. The Client ID is public by design. Google only accepts it from the origins listed above.
+The app uses the `drive.file` scope, so it only sees files it created and has no access to the rest of your Drive. The Client ID is public by design. Sign-in lasts about an hour, and reconnecting takes one click. Changes made in the meantime are kept in the browser.
 
-Sign-in tokens last about an hour. After that, the app asks you to sign in again with one click, and your changes in the meantime are kept in the browser and synced after sign-in.
+## Running locally
 
-## Running
-
-**Online:** GitHub Pages. In the repository settings, go to **Pages → Deploy from a branch → `main` / root**.
-
-**Locally:** serve the folder over HTTP (Google sign-in does not work from `file://`):
+Google sign-in does not work from `file://`, so serve the folder over HTTP:
 
 ```
 python -m http.server 8000
 ```
 
-Then open http://localhost:8000.
+Then open http://localhost:8000. GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.
 
 ## Project structure
 
 ```
-index.html            markup
-css/style.css         styles
-js/config.js          settings (Google Client ID)
-js/gdrive.js          Google Drive storage
-js/app.js             application
-manifest.webmanifest  install as an app on a phone/desktop
+index.html                 markup
+css/style.css              styles, light and dark themes (CSS variables)
+js/config.js               settings: Google Client ID
+js/gdrive.js               Google Drive storage
+js/app.js                  application
+docs/google-drive-setup.md Google Drive setup guide (RU)
+manifest.webmanifest       install as an app
 ```
 
-Personal data files (`3d-print-data*.json`, `photos/`, `backups/`) are listed in `.gitignore` and are never committed.
+Plain HTML, CSS and JavaScript, with no build step and no dependencies. Personal data files (`3d-print-data*.json`, `photos/`, `backups/`) are listed in `.gitignore`.
 
 ## Planned
 
 - [ ] Import grams and print time from Bambu Studio `.gcode.3mf`
-- [ ] Hardware/consumables catalog (screws, magnets, inserts) with prices
+- [ ] Hardware / consumables catalog (screws, magnets, inserts) with prices
 - [ ] Printer maintenance schedule by print hours
 - [ ] Failure rate allowance and "price for friends" markup
-- [ ] Spool labels with QR codes, Spoolman import/export
-- [ ] Multiple printers
+- [ ] Spool labels with QR codes, Spoolman import / export
 
 ## License
 

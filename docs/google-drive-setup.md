@@ -70,16 +70,15 @@
 
 ## Шаг 5. Вписать Client ID в сайт
 
-Любой из вариантов:
+Откройте в проекте файл `js/config.js` и вставьте Client ID:
 
-- **На сайте** (быстро, только для этого браузера): https://fomins.github.io/3d-print-calculator/ → **Настройки** → блок **Google Drive** → раскрыть **Google Client ID** → вставить.
-- **В коде** (для всех устройств сразу): в файле `js/config.js`:
-  ```js
-  window.APP_CONFIG = {
-    googleClientId: '1234567890-abcdef….apps.googleusercontent.com',
-  };
-  ```
-  Затем `git commit` и `git push`, подождать 1–2 минуты, пока обновится GitHub Pages, и обновить страницу (Ctrl+F5).
+```js
+window.APP_CONFIG = {
+  googleClientId: '1234567890-abcdef….apps.googleusercontent.com',
+};
+```
+
+Затем `git commit` и `git push`, подождите 1–2 минуты, пока обновится GitHub Pages, и обновите страницу (Ctrl+F5). Client ID публичный, его можно хранить в репозитории: Google принимает его только с адресов из *Authorized JavaScript origins*.
 
 ## Шаг 6. Подключить
 
@@ -92,7 +91,7 @@
 4. В настройках должно появиться «Google Drive — сохранено …», а в вашем Google Drive — папка **3D Print Calculator** с файлом `3d-print-data.json`.
 5. Если до этого была подключена папка с фото — сайт предложит перенести фото в Drive.
 
-На телефоне: откройте сайт, вставьте тот же Client ID (если он не в `config.js`) и нажмите «Подключить Google Drive» — данные подтянутся.
+На телефоне: откройте сайт и нажмите «Настройки → Подключить Google Drive» — данные подтянутся.
 
 ---
 
@@ -105,5 +104,6 @@
 | `Error 401: invalid_client` | Client ID скопирован с ошибкой или удалён. Скопируйте заново из **Clients**. |
 | «Google Drive 403: … has not been used in project … or it is disabled» | Не включён Google Drive API (шаг 2) или включён в другом проекте. |
 | «Браузер заблокировал окно входа Google» | Разрешите всплывающие окна для `fomins.github.io` (значок в адресной строке) и нажмите кнопку ещё раз. |
+| «Не задан Google Client ID» | Client ID не вписан в `js/config.js` или изменения ещё не опубликованы на GitHub Pages (шаг 5). |
 | Ничего не происходит при нажатии | Страница открыта как файл (`file:///…`). Вход Google работает только с адреса сайта или `http://localhost`. |
 | Через час просит войти снова | Так устроен вход Google для сайтов без сервера: доступ выдаётся на час. Нажмите «Войти в Google» — изменения, сделанные за это время, сохранятся. |
