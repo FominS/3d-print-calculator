@@ -392,8 +392,11 @@ function remBar(s,g){const p=Math.max(0,Math.min(100,number(s.net)?g/number(s.ne
 function renderSpools(){
   const q=$('spoolSearch').value.trim().toLowerCase(),f=$('spoolFilter').value,low=number(db.settings.lowStock);
   const all=db.spools.map(s=>({s,st:spoolState(s)}));
-  const byMat=new Map();for(const {s,st} of all){if(s.status==='empty')continue;const m=byMat.get(s.materialId)||{n:0,g:0,m:0,low:0};m.n++;m.g+=Math.max(0,st.remaining);m.m+=toM(s,Math.max(0,st.remaining));if(st.remaining<low)m.low++;byMat.set(s.materialId,m)}
-  $('spoolTiles').innerHTML=[...byMat.entries()].sort((a,b)=>b[1].g-a[1].g).map(([mid,m])=>`<div class="stat"><span class="muted">${escape(getMat(mid).name)} · ${m.n} кат.</span><strong>${fmt(m.g,0)} г</strong><small>≈ ${fmt(m.m,0)} м${m.low?` · <span style="color:var(--neg)">мало: ${m.low}</span>`:''}</small></div>`).join('');
+  // стоимость остатка: по цене катушки, а если она не указана — по цене материала за кг
+  const remValue=(s,g)=>{g=Math.max(0,g);return s.price&&number(s.net)?g*s.price/number(s.net):g*number(getMat(s.materialId).price)/1000};
+  const byMat=new Map();let totV=0,totG=0,totN=0,est=0,bought=0;for(const {s,st} of all){if(s.price)bought+=s.price;if(s.status==='empty')continue;const m=byMat.get(s.materialId)||{n:0,g:0,m:0,low:0,v:0};const g=Math.max(0,st.remaining),v=remValue(s,g);m.n++;m.g+=g;m.m+=toM(s,g);m.v+=v;if(st.remaining<low)m.low++;byMat.set(s.materialId,m);totV+=v;totG+=g;totN++;if(!s.price)est++}
+  $('spoolTiles').innerHTML=(totN?`<div class="stat stat-total" title="${est?`У ${est} кат. цена не указана — посчитано по цене материала за кг`:'По ценам покупки катушек'}"><span class="muted">Пластик на складе · ${totN} кат.</span><strong>${money(totV)}</strong><small>${fmt(totG/1000,2)} кг${bought?` · куплено всего на ${money(bought)}`:''}${est?` · без цены: ${est} кат. (по цене материала)`:''}</small></div>`:'')
+    +[...byMat.entries()].sort((a,b)=>b[1].g-a[1].g).map(([mid,m])=>`<div class="stat"><span class="muted">${escape(getMat(mid).name)} · ${m.n} кат.</span><strong>${fmt(m.g,0)} г</strong><small>≈ ${fmt(m.m,0)} м · ${money(m.v)}${m.low?` · <span style="color:var(--neg)">мало: ${m.low}</span>`:''}</small></div>`).join('');
   const list=all.filter(({s})=>(f==='all'||(f==='empty'?s.status==='empty':s.status!=='empty'))&&(spName(s)+' '+getMat(s.materialId).name+' '+s.store).toLowerCase().includes(q));
   $('spoolEmpty').hidden=list.length>0;$('spoolEmpty').textContent=db.spools.length?'Ничего не найдено.':'Катушек пока нет. Нажмите «+ Катушка».';
   const sortBy=$('spoolSort').value,grp=$('spoolGroup').value,dkey=s=>s.purchased||s.createdAt.slice(0,10);

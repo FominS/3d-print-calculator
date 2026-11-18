@@ -255,3 +255,4 @@ tr.grp td{background:var(--sub);cursor:pointer;font-size:13.5px}tr.grp:hover td{
 table.proto .spick{min-width:170px}table.proto .spick-btn{padding:6px 8px;min-height:34px;font-size:13px}
 .pfhead{grid-template-columns:150px 110px 1fr 160px!important}.pfhead label:last-child{grid-column:1/-1}
 @media(max-width:800px){.pfhead{grid-template-columns:1fr 1fr!important}}
+.stat-total{background:var(--sel);border:1px solid var(--accent)}
