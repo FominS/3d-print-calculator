@@ -396,7 +396,15 @@ function renderSpools(){
   $('spoolTiles').innerHTML=[...byMat.entries()].sort((a,b)=>b[1].g-a[1].g).map(([mid,m])=>`<div class="stat"><span class="muted">${escape(getMat(mid).name)} · ${m.n} кат.</span><strong>${fmt(m.g,0)} г</strong><small>≈ ${fmt(m.m,0)} м${m.low?` · <span style="color:var(--neg)">мало: ${m.low}</span>`:''}</small></div>`).join('');
   const list=all.filter(({s})=>(f==='all'||(f==='empty'?s.status==='empty':s.status!=='empty'))&&(spName(s)+' '+getMat(s.materialId).name+' '+s.store).toLowerCase().includes(q));
   $('spoolEmpty').hidden=list.length>0;$('spoolEmpty').textContent=db.spools.length?'Ничего не найдено.':'Катушек пока нет. Нажмите «+ Катушка».';
-  $('spoolRows').innerHTML=list.map(({s,st})=>{const g=st.remaining,isLow=s.status!=='empty'&&g<low;return`<tr class="click" data-spool="${escape(s.id)}"><td>${swatch(s)}</td><td><b>${escape(s.brand||'—')}</b>${s.store?`<div><small>${escape(s.store)}</small></div>`:''}</td><td>${escape([s.series,s.color].filter(x=>String(x).trim()).join(' · ')||'—')}</td><td>${escape(getMat(s.materialId).name)}</td><td><span style="${isLow?'color:var(--neg)':''}">${fmt(g,0)} г · ${fmt(toM(s,g),0)} м${isLow?' · мало':''}</span>${remBar(s,g)}</td><td class="num">${s.price?money(s.price)+`<div><small>${money(s.price/number(s.net)*1000)}/кг</small></div>`:'—'}</td><td>${escape(s.purchased)}</td><td><span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span></td></tr>`}).join('');
+  const sortBy=$('spoolSort').value,grp=$('spoolGroup').value,dkey=s=>s.purchased||s.createdAt.slice(0,10);
+  const cmp={remAsc:(a,b)=>a.st.remaining-b.st.remaining,remDesc:(a,b)=>b.st.remaining-a.st.remaining,dateDesc:(a,b)=>dkey(b.s).localeCompare(dkey(a.s)),dateAsc:(a,b)=>dkey(a.s).localeCompare(dkey(b.s)),name:(a,b)=>spName(a.s).localeCompare(spName(b.s),'ru')}[sortBy]||(()=>0);
+  list.sort(cmp);
+  const row=({s,st})=>{const g=st.remaining,isLow=s.status!=='empty'&&g<low;return`<tr class="click" data-spool="${escape(s.id)}"><td>${swatch(s)}</td><td><b>${escape(s.brand||'—')}</b>${s.store?`<div><small>${escape(s.store)}</small></div>`:''}</td><td>${escape([s.series,s.color].filter(x=>String(x).trim()).join(' · ')||'—')}</td><td>${escape(getMat(s.materialId).name)}</td><td><span style="${isLow?'color:var(--neg)':''}">${fmt(g,0)} г · ${fmt(toM(s,g),0)} м${isLow?' · мало':''}</span>${remBar(s,g)}</td><td class="num">${s.price?money(s.price)+`<div><small>${money(s.price/number(s.net)*1000)}/кг</small></div>`:'—'}</td><td>${escape(s.purchased)}</td><td><span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span></td></tr>`};
+  if(grp!=='material'){$('spoolRows').innerHTML=list.map(row).join('')}
+  else{const groups=new Map();for(const x of list){const k=x.s.materialId;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x)}
+    const closed=new Set(($('spoolRows').dataset.closed||'').split(',').filter(Boolean));
+    $('spoolRows').innerHTML=[...groups.entries()].sort((a,b)=>getMat(a[0]).name.localeCompare(getMat(b[0]).name,'ru')).map(([k,xs])=>{const g=xs.reduce((a,x)=>a+Math.max(0,x.st.remaining),0),m=xs.reduce((a,x)=>a+toM(x.s,Math.max(0,x.st.remaining)),0),lw=xs.filter(x=>x.s.status!=='empty'&&x.st.remaining<low).length,open=!closed.has(k);
+      return`<tr class="grp" data-sgrp="${escape(k)}"><td colspan="8"><span class="caret">${open?'▾':'▸'}</span><b>${escape(getMat(k).name)}</b><span class="muted"> · катушек ${xs.length} · ${fmt(g,0)} г ≈ ${fmt(m,0)} м${lw?` · <span style="color:var(--neg)">мало: ${lw}</span>`:''}</span></td></tr>`+(open?xs.map(row).join(''):'')}).join('')}
   $('navSpools').textContent=all.filter(({s,st})=>s.status!=='empty'&&st.remaining<low).length?'!':''}
 
 
@@ -419,7 +427,7 @@ function renderSpoolRem(){const s=spool();if(!s)return;const st=spoolState(s),g=
   $('spHist').innerHTML=st.events.slice().reverse().map(e=>`<tr><td>${escape(e.date||'')}</td><td>${e.item?`<a href="#item/${escape(e.item)}" class="lnk">${escape(e.label)}</a>`:escape(e.label)}</td><td class="num" style="color:${e.delta<0?'var(--neg)':'var(--pos)'}">${e.delta>0?'+':''}${fmt(e.delta,1)} г<div><small>${e.delta>0?'+':''}${fmt(toM(s,e.delta),1)} м</small></div></td><td class="num">${fmt(e.after,0)} г</td><td>${e.op?`<button class="iconbtn danger" data-delop="${escape(e.op)}" title="Отменить корректировку">×</button>`:''}</td></tr>`).join('')+`<tr><td>${escape(s.purchased||s.createdAt.slice(0,10))}</td><td>Новая катушка</td><td class="num">+${fmt(s.net,0)} г</td><td class="num">${fmt(s.net,0)} г</td><td></td></tr>`}
 function updateCorrHint(){const s=spool();if(!s)return;const v=number($('corrVal').value),u=$('corrUnit').value;$('corrHint').textContent=v?(u==='m'?`${fmt(v,1)} м ≈ ${fmt(v*gPerM(s),1)} г`:`${fmt(v,1)} г ≈ ${fmt(toM(s,v),1)} м`):''}
 function addOp(s,type,grams,note){s.ops.push({id:shortId(),at:now(),date:today(),type,grams:Math.max(0,grams),note});if(s.status==='sealed'&&type!=='add')s.status='open';const r=spoolState(s).remaining;if(r<=0&&s.status!=='empty'&&confirm('Остаток 0 — отметить катушку как закончившуюся?'))s.status='empty';persist();renderSpool();renderSpools()}
-function newSpool(from){const s=normSpool(from?{...structuredClone(from),id:'',ops:[],createdAt:'',status:'sealed',opened:'',dried:''}:{materialId:db.materials[0]?.id,purchased:today()});db.spools.unshift(s);persist();renderSpools();go('spool/'+s.id)}
+function newSpool(from,tpl){const s=normSpool(from?{...structuredClone(from),id:'',ops:[],createdAt:'',status:'sealed',opened:'',dried:''}:{materialId:tpl?.materialId||db.materials[0]?.id,diameter:tpl?.diameter,net:tpl?.net,purchased:today()});db.spools.unshift(s);persist();renderSpools();go('spool/'+s.id)}
 
 
 function afterColor(full){renderColorChips();if(full)renderColorEdit();renderSpoolHead();renderSpoolRem();schedulePersist();renderSpools()}
@@ -434,7 +442,10 @@ $('page-spool').addEventListener('click',e=>{const b=e.target.closest('[data-qf]
 $('page-spool').addEventListener('change',e=>{const s=spool(),k=e.target.dataset.sf;if(!s||!['series','store','brand'].includes(k))return;libAbsorb(s,db.lib,k);renderQuick();renderLibs();schedulePersist()});
 $('spoolAdd').onclick=()=>newSpool();
 $('spoolSearch').oninput=renderSpools;$('spoolFilter').onchange=renderSpools;
-$('spoolRows').onclick=e=>{const tr=e.target.closest('[data-spool]');if(tr)go('spool/'+tr.dataset.spool)};
+try{const v=JSON.parse(localStorage.getItem('p2s_spool_view')||'{}');if(v.sort)$('spoolSort').value=v.sort;if(v.group)$('spoolGroup').value=v.group}catch{}
+const saveSpoolView=()=>{try{localStorage.setItem('p2s_spool_view',JSON.stringify({sort:$('spoolSort').value,group:$('spoolGroup').value}))}catch{}renderSpools()};
+$('spoolSort').onchange=saveSpoolView;$('spoolGroup').onchange=saveSpoolView;
+$('spoolRows').onclick=e=>{const g=e.target.closest('[data-sgrp]');if(g){const set=new Set(($('spoolRows').dataset.closed||'').split(',').filter(Boolean)),k=g.dataset.sgrp;set.has(k)?set.delete(k):set.add(k);$('spoolRows').dataset.closed=[...set].join(',');renderSpools();return}const tr=e.target.closest('[data-spool]');if(tr)go('spool/'+tr.dataset.spool)};
 $('page-spool').addEventListener('input',e=>{const s=spool(),el=e.target,k=el.dataset.sf;if(!s||!k)return;
   if(k==='brand'&&el.value==='__add'){const n=(prompt('Название производителя:')||'').trim();if(n){let b=libBrand(n);if(!b)db.lib.brands.push(b={name:n,series:[]});s.brand=b.name}el.innerHTML=brandOptions(s.brand);persist();renderSpoolHead();renderQuick();renderLibs();return}
   s[k]=['net','price','diameter'].includes(k)?number(el.value):k==='empty'?(el.value===''?'':number(el.value)):el.value;
@@ -447,6 +458,7 @@ $('weighApply').onclick=()=>{const s=spool(),gross=number($('weighGross').value)
 $('weighNew').onclick=()=>{const s=spool(),gross=number($('weighGross').value);if(!s)return;if(!gross){alert('Введите вес катушки на весах');return}const e=gross-number(s.net);if(e<=0){alert('Брутто меньше веса филамента — проверьте вес нетто');return}if(spoolState(s).used>0&&!confirm('По катушке уже есть списания. Всё равно считать её полной?'))return;s.empty=Math.round(e);persist();renderSpool();setStatus(`Вес пустой катушки: ${fmt(s.empty,0)} г`)};
 $('weighHint').onclick=e=>{const v=e.target.dataset.useempty;if(v===undefined)return;const s=spool();s.empty=number(v);persist();renderSpool()};
 $('spHist').onclick=e=>{const id=e.target.dataset.delop;if(!id)return;const s=spool();if(!confirm('Отменить эту корректировку?'))return;s.ops=s.ops.filter(o=>o.id!==id);persist();renderSpool();renderSpools()};
+$('spNew').onclick=()=>{const s=spool();newSpool(null,s);setStatus('Новая катушка — заполните параметры')};
 $('spDup').onclick=()=>{const s=spool();if(s){newSpool(s);setStatus('Создана копия катушки')}};
 $('spDel').onclick=()=>{const s=spool();if(!s)return;const used=db.prints.some(p=>p.usage.some(u=>u.spoolId===s.id))||db.items.some(i=>i.prototypes.some(p=>p.spoolId===s.id));if(!confirm(used?'Катушка упоминается в журнале печати — записи останутся без катушки. Удалить?':'Удалить катушку?'))return;db.spools=db.spools.filter(x=>x!==s);persist();renderSpools();go('spools')};
 

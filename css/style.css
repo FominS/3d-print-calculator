@@ -241,3 +241,5 @@ tr.grp td{background:var(--sub);cursor:pointer;font-size:13.5px}tr.grp:hover td{
 .footrow{display:flex;align-items:center;gap:8px}.footrow .navfile{flex:1;min-width:0}.themebtn{background:var(--btn2);color:var(--btn2-fg);padding:5px 9px;font-size:14px;line-height:1;border-radius:8px}
 .gdhelp{display:inline-block;margin-top:10px;font-size:13px}
 @media(max-width:800px){.librow{grid-template-columns:1fr auto}.librow .chips{grid-column:1/-1}.colrow{grid-template-columns:28px 1fr auto}.colrow .stops{grid-column:1/-1}.colrow>.muted{display:none}.prcard .fields{grid-template-columns:1fr 1fr}.footrow{gap:4px}}
+
+#spoolSearch{max-width:250px}.toolbar select{max-width:100%}
