@@ -10,13 +10,24 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 
 ## Features
 
+### Home dashboard
+- The start page: statistics for the current month, or for another month, a year or all time.
+- Prints (successful and failed), printed items, printer time, filament used by material, total cost by category, failure rate and cost of failures.
+- Charts by day or month, cost structure, filament by material, the last 5 prints and spools that are running low.
+- Quick actions: log a print, calculate a print, add an item.
+- Built from actual print log records: grams written off the spools and the recorded print time. Catalog estimates are not used.
+
 ### Calculator
+- Main fields only (material, grams, time) with the total shown instantly. The breakdown, printer, extra costs and prototypes are in expandable blocks.
+- "Save as item" is a separate step.
 - Cost breakdown: filament, electricity, printer depreciation, maintenance, extra costs.
 - Print time as hours + minutes with a 0–48 h slider. Decimal hours (`2.5`, `2,5`) and `2:30` are accepted too.
 - Printer selection and prototypes (test prints) counted separately as development cost.
 - Save to the catalog in one click and continue on the item page.
 
 ### Item catalog and item page
+- Cards with photos or a table, plus search, filters (status, material) and sorting. Quick actions on cards: open, print, duplicate.
+- The item page has tabs: **Overview**, **Composition**, **Print log** and **More**. "Log a print" is the main action, and delete is in the ⋯ menu.
 - Status (idea / in progress / done / published), tags, notes, printer, extra costs.
 - Links with one-click presets for MakerWorld, Thingiverse and Printables. Titles are detected from the URL.
 - **Parts**: quantity, print time and several filaments per part (AMS multicolor). Cost is shown per part and for the whole item.
@@ -25,6 +36,8 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - **MakerWorld description generator** (RU/EN) built from parts and print settings.
 
 ### Filament spools
+- Compact cards or a table, with filters by material, brand and availability. Spools that are running low are highlighted.
+- The spool form shows the main fields first. Technical details (diameter, empty weight, dates, store) are in an expandable block.
 - Brand, series, color, net weight, diameter, price, store, purchase / opened / dried dates.
 - Remaining amount in grams and meters, a low-stock warning and spool history.
 - Correct the remaining amount manually (grams or meters) or by weighing the spool. The empty spool weight is derived from a new sealed spool.
@@ -35,6 +48,8 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Quick picks in the spool form. New values are remembered automatically, and renaming a library entry updates the spools that use it.
 
 ### Print log
+- Timeline, by month, by year or as a table, with filters by result and item.
+- Each record stores the print time. Success or failure is set with one button, and ↻ repeats a print with the same spools, grams and time.
 - "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
 - View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.
 
@@ -58,6 +73,10 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Before overwriting a data file, the previous version goes to `backups/`.
 - Google Drive: changes from another device are picked up when you return to the tab, but never while you are typing. Real conflicts are detected by file content (MD5). You choose which version to keep, and the other one is backed up.
 - A warning is shown if the app is open in several tabs.
+
+### Navigation
+- Main sections: Home, Calculator, Items, Print log, Filament. Statistics and Settings are secondary.
+- On phones, a bottom tab bar is used. The save/sync status is in the top right corner.
 
 ### Other
 - Light and dark themes, or follow the system setting.
