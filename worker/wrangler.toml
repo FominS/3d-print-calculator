@@ -1,0 +1,9 @@
+# Деплой из командной строки: cd worker && npx wrangler deploy
+name = "bambu-proxy"
+main = "bambu-proxy.js"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+[vars]
+# Сайты, которым разрешено обращаться к прокси (через запятую, без "/" в конце).
+ALLOWED_ORIGINS = "https://fomins.github.io,http://localhost:8000"

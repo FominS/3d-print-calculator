@@ -412,7 +412,7 @@ function normSpool(s){return{id:String(s.id||uid()),materialId:String(s.material
   diameter:number(s.diameter)||1.75,net:number(s.net)||1000,empty:s.empty===''||s.empty==null?'':number(s.empty),price:number(s.price),purchased:String(s.purchased||''),store:String(s.store||''),
   status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),createdAt:s.createdAt||now(),
   ops:(Array.isArray(s.ops)?s.ops:[]).filter(o=>OPNAMES[o?.type]).map(o=>({id:String(o.id||shortId()),at:o.at||now(),date:String(o.date||String(o.at||now()).slice(0,10)),type:o.type,grams:number(o.grams),note:String(o.note||'')}))}}
-function normPrint(p){return{id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),itemId:String(p.itemId||''),itemName:String(p.itemName||''),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),sets:Math.max(1,Math.round(number(p.sets))||1),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),
+function normPrint(p){return{id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),itemId:String(p.itemId||''),itemName:String(p.itemName||''),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),sets:Math.max(1,Math.round(number(p.sets))||1),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),src:String(p.src||''),
   usage:(Array.isArray(p.usage)?p.usage:[]).map(u=>({label:String(u.label||''),materialId:String(u.materialId||''),spoolId:String(u.spoolId||''),grams:number(u.grams)}))}}
 const getSpool=id=>db.spools.find(s=>s.id===id);
 const spName=s=>[s.brand,s.series,s.color].map(x=>String(x).trim()).filter(Boolean).join(' ')||'Без названия';
@@ -660,7 +660,7 @@ function printRow(p,withItem){const c=printCalc(p),multi=db.printers.length>1,sp
 const LOG_HEAD=(withItem,multi)=>`<tr><th>Дата</th>${multi&&withItem?'<th>Принтер</th>':''}${withItem?'<th>Изделие</th>':''}<th>Материал</th><th class="num">Компл.</th><th class="num">Время</th><th>Результат</th><th class="num">Филамент</th><th class="num">Себестоимость</th><th>Катушки</th><th>Комментарий</th><th></th></tr>`;
 function repeatPrint(id){const p=db.prints.find(x=>x.id===id);if(!p)return;const low=p.usage.map(u=>getSpool(u.spoolId)).filter(s=>s&&spoolState(s).remaining<number(p.usage.find(u=>u.spoolId===s.id).grams));
   if(!confirm(`Повторить печать «${p.itemName}» сегодня с теми же параметрами?\n${p.sets>1?p.sets+' компл. · ':''}${fmtH(printHours(p))} · ${fmt(printGrams(p),1)} г${low.length?`\n\n⚠ На катушке не хватает пластика: ${low.map(spName).join(', ')}`:''}`))return;
-  const np=normPrint({...structuredClone(p),id:'',at:now(),date:today(),result:'ok',hours:printHours(p)});db.prints.push(np);persist();renderList();if(currentPage==='item')renderItemPrints();setStatus('Печать повторена и записана')}
+  const np=normPrint({...structuredClone(p),id:'',src:'',at:now(),date:today(),result:'ok',hours:printHours(p)});db.prints.push(np);persist();renderList();if(currentPage==='item')renderItemPrints();setStatus('Печать повторена и записана')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-repeat]');if(b){e.preventDefault();repeatPrint(b.dataset.repeat)}});
 function delPrint(id){if(!confirm('Удалить запись? Списанные граммы вернутся на катушки.'))return;db.prints=db.prints.filter(p=>p.id!==id);persist();renderList();if(currentPage==='item')renderItemPrints()}
 $('logRows').onclick=e=>{const id=e.target.dataset.delprint;if(id)delPrint(id)};
@@ -832,6 +832,94 @@ window.addEventListener('beforeunload',e=>{if(persistTimer)persist();if(store&&s
 try{const bc=new BroadcastChannel('p2s_cost_tabs'),me=shortId();let warned=false;
   const warn=()=>{if(warned)return;warned=true;const b=document.createElement('div');b.className='tabwarn';b.innerHTML='Калькулятор открыт в нескольких вкладках — оставьте одну, иначе вкладки будут перезаписывать данные друг друга. <button class="linkbtn">Понятно</button>';b.querySelector('button').onclick=()=>b.remove();document.body.append(b)};
   bc.onmessage=e=>{if(e.data?.id===me)return;if(e.data?.t==='hello')bc.postMessage({t:'here',id:me});warn()};bc.postMessage({t:'hello',id:me})}catch{}
+
+/* ================= Bambu Lab Cloud: вход и импорт истории печати ================= */
+const BB=window.Bambu;
+let bbTasks=[],bbPick=new Map(),bbAccount='',bbBusy=false;
+function bbStateUi(){const s=BB.state(),on=BB.connected();
+  if(document.activeElement!==$('bbProxy'))$('bbProxy').value=s.proxy||window.APP_CONFIG?.bambuProxy||'';$('bbRegion').value=BB.region();
+  if(!$('bbEmail').value&&s.account)$('bbEmail').value=s.account;
+  $('bbState').innerHTML=on?`<span class="ok">● Подключено</span>${s.account?' · '+escape(s.account):''}${s.expires?` · токен до ${new Date(s.expires).toLocaleDateString('ru-RU')}${BB.expired()?' — <b>истёк</b>':''}`:''}`:BB.proxy()?'Не подключено':'Не подключено · сначала укажите адрес прокси';
+  $('bbLoginBox').hidden=on;$('bbLogout').hidden=!on;$('bbOpen2').hidden=!on}
+async function bbRun(btn,fn){if(bbBusy)return;bbBusy=true;const t=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='…'}
+  try{return await fn()}catch(e){if(!e?.silent)alert(e?.message||String(e))}finally{bbBusy=false;if(btn){btn.disabled=false;btn.textContent=t}bbStateUi()}}
+const bbEmail=()=>{const v=$('bbEmail').value.trim();if(!v){alert('Введите email аккаунта Bambu Lab');$('bbEmail').focus();throw Object.assign(new Error(''),{silent:true})}return v};
+$('bbProxy').onchange=()=>{BB.patch({proxy:$('bbProxy').value.trim().replace(/\/+$/,'')});bbStateUi()};
+$('bbRegion').onchange=()=>{BB.patch({region:$('bbRegion').value});bbStateUi()};
+function bbAskCode(acc,hint){bbAccount=acc;$('bbCodeBox').hidden=false;$('bbCodeHint').textContent=hint||`Bambu Lab отправил код на ${acc}. Введите его ниже.`;$('bbCode').value='';$('bbCode').focus()}
+function bbDone(){$('bbPass').value='';$('bbCode').value='';$('bbCodeBox').hidden=true;setStatus('Bambu Lab Cloud подключён');bbStateUi()}
+$('bbLogin').onclick=()=>{let acc;try{acc=bbEmail()}catch{return}const pw=$('bbPass').value;if(!pw){alert('Введите пароль или войдите по коду из письма');$('bbPass').focus();return}
+  bbRun($('bbLogin'),async()=>{const r=await BB.login(acc,pw);$('bbPass').value='';
+    if(r.needCode)bbAskCode(acc);else if(r.tfa)alert('В аккаунте включена двухфакторная аутентификация — этот вход сайт не поддерживает. Используйте «Ввести токен вручную» (см. инструкцию).');else bbDone()})};
+$('bbCodeOnly').onclick=()=>{let acc;try{acc=bbEmail()}catch{return}bbRun($('bbCodeOnly'),async()=>{await BB.sendCode(acc);bbAskCode(acc)})};
+$('bbResend').onclick=()=>bbRun($('bbResend'),async()=>{await BB.sendCode(bbAccount||bbEmail());setStatus('Код отправлен ещё раз')});
+$('bbCodeOk').onclick=()=>{const c=$('bbCode').value.trim();if(!c){$('bbCode').focus();return}bbRun($('bbCodeOk'),async()=>{await BB.loginCode(bbAccount||bbEmail(),c);bbDone()})};
+$('bbCode').onkeydown=e=>{if(e.key==='Enter')$('bbCodeOk').click()};
+$('bbPass').onkeydown=e=>{if(e.key==='Enter')$('bbLogin').click()};
+$('bbTokenOk').onclick=()=>{try{BB.setToken($('bbToken').value);if($('bbEmail').value.trim())BB.patch({account:$('bbEmail').value.trim()});$('bbToken').value='';bbDone()}catch(e){alert(e.message)}};
+$('bbLogout').onclick=()=>{if(!confirm('Выйти из Bambu Lab Cloud? Токен будет удалён из этого браузера. Импортированные записи журнала останутся.'))return;BB.logout();bbStateUi()};
+
+/* --- сопоставление с данными калькулятора --- */
+const bbNorm=s=>String(s||'').toLowerCase().replace(/\.(gcode\.)?3mf$/,'').replace(/[_\-–—.()[\]]+/g,' ').replace(/\s+/g,' ').trim();
+function bbMatchItem(t){const a=bbNorm(t.title),b=bbNorm(t.file),its=db.items.map(i=>[i,bbNorm(i.name)]).filter(([,n])=>n);
+  const eq=its.find(([,n])=>n===a||n===b);if(eq)return eq[0].id;
+  const inc=its.filter(([,n])=>n.length>=4&&(a.includes(n)||b.includes(n)||(a.length>=4&&n.includes(a)))).sort((x,y)=>y[1].length-x[1].length);return inc[0]?.[0].id||''}
+function bbMatchMat(type){const T=String(type).toUpperCase().trim();if(!T)return'';const ms=db.materials.map(m=>[m,m.name.toUpperCase().trim()]);
+  const eq=ms.find(([,n])=>n===T);if(eq)return eq[0].id;const inc=ms.filter(([,n])=>n&&(T.includes(n)||n.includes(T))).sort((a,b)=>b[1].length-a[1].length);return inc[0]?.[0].id||''}
+const hexRgb=h=>{const m=/^#?([0-9a-f]{6})/i.exec(h||'');if(!m)return null;const n=parseInt(m[1],16);return[n>>16&255,n>>8&255,n&255]};
+const colDist=(a,b)=>{const x=hexRgb(a),y=hexRgb(b);if(!x||!y)return 999;return Math.hypot(x[0]-y[0],x[1]-y[1],x[2]-y[2])};
+function bbMatchSpool(f,mid){if(!mid)return'';const {list,rem}=sortedSpools(mid);let best='',bd=1e9;
+  for(const s of list){if(rem.get(s.id)<=0)continue;const d=Math.min(colDist(f.color,s.colorHex),...s.colorStops.map(c=>colDist(f.color,c)))+(s.status==='open'?0:15);if(d<bd){bd=d;best=s.id}}
+  return bd<=110?best:''}
+// Для неудачной печати Bambu отдаёт расход всей модели — уменьшаем пропорционально фактическому времени.
+const bbRatio=t=>t.result==='fail'&&t.est>0&&!t.estimated?Math.min(1,t.seconds/t.est):1;
+function bbDefault(t){const k=bbRatio(t),fil=t.filaments.length?t.filaments:(t.grams?[{type:'',color:'',grams:t.grams,slot:''}]:[]);
+  return{on:t.result!=='running'&&!bbImported(t.id),itemId:bbMatchItem(t),
+    usage:fil.map(f=>{const mid=bbMatchMat(f.type),sid=bbMatchSpool(f,mid);return{f,pick:sid?'s:'+sid:'m:'+mid,grams:Math.round(f.grams*k*10)/10}})}}
+const bbImported=id=>db.prints.some(p=>p.src==='bambu:'+id);
+function bbUseOptions(sel){const spools=db.spools.filter(s=>s.status!=='empty'||sel==='s:'+s.id).slice().sort((a,b)=>getMat(a.materialId).name.localeCompare(getMat(b.materialId).name)||spName(a).localeCompare(spName(b)));
+  return`<optgroup label="Списать с катушки">${spools.map(s=>`<option value="s:${escape(s.id)}"${sel==='s:'+s.id?' selected':''}>${escape(getMat(s.materialId).name)} · ${escape(spName(s))} · ${fmt(spoolState(s).remaining,0)} г</option>`).join('')}</optgroup>`+
+    `<optgroup label="Без списания, только материал">${db.materials.map(m=>`<option value="m:${escape(m.id)}"${sel==='m:'+m.id?' selected':''}>${escape(m.name)}</option>`).join('')}<option value="m:"${sel==='m:'?' selected':''}>Материал не выбран</option></optgroup>`}
+const bbDate=iso=>{const d=new Date(iso);return isNaN(d)?today():d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+
+/* --- диалог импорта --- */
+function bbRender(){const show=$('bbShowDone').checked,list=bbTasks.filter(t=>show||!bbImported(t.id));
+  const nDone=bbTasks.filter(t=>bbImported(t.id)).length;
+  $('bbInfo').textContent=bbTasks.length?`Заданий в облаке: ${bbTasks.length}${nDone?` · уже в журнале: ${nDone}`:''}. Проверьте изделие и катушки — граммы спишутся с выбранных катушек.`:'';
+  const itemOpts=sel=>`<option value="">— без изделия —</option>`+db.items.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(i=>`<option value="${escape(i.id)}"${i.id===sel?' selected':''}>${escape(i.name)}</option>`).join('');
+  $('bbList').innerHTML=list.length?list.map(t=>{const st=bbPick.get(t.id),done=bbImported(t.id),run=t.result==='running',dis=run||done;
+    return`<div class="bb-row${st.on&&!dis?' on':''}${dis?' dis':''}" data-bt="${escape(t.id)}"><label class="bb-chk"><input type="checkbox" data-bf="on"${st.on&&!dis?' checked':''}${dis?' disabled':''} aria-label="Импортировать"></label>
+      <div class="thumb">${t.cover?`<img src="${escape(t.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'◈'}</div>
+      <div class="bb-main"><div class="bb-ttl"><b>${escape(t.title)}</b>${run?'<span class="pill wip">печатается</span>':`<span class="pill ${t.result==='fail'?'fail':'done'}">${t.result==='fail'?'✕ Неудачно':'✓ Успешно'}</span>`}${done?'<span class="pill sp-empty">в журнале</span>':''}</div>
+        <div class="tl-meta"><span>${t.start?escape(new Date(t.start).toLocaleString('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})):'—'}</span><span>⏱ ${fmtH(t.seconds/3600)}${t.estimated?' <small>(оценка)</small>':''}</span><span>${fmt(t.grams,1)} г</span>${t.plate?`<span>${escape(t.plate)}</span>`:''}${t.deviceName?`<span>${escape(t.deviceName)}</span>`:''}</div>
+        ${dis?'':`<label class="bb-it">Изделие<select data-bf="item">${itemOpts(st.itemId)}</select></label>
+        ${st.usage.map((u,i)=>`<div class="bb-fil"><span class="swatch sm" style="background:${u.f.color||'var(--faint)'}"></span><small>${escape(u.f.type||'?')}${u.f.slot?' · '+escape(u.f.slot):''}</small><input type="number" min="0" step="0.1" value="${u.grams}" data-bf="g" data-i="${i}" aria-label="Граммы"><small>г</small><select data-bf="use" data-i="${i}">${bbUseOptions(u.pick)}</select></div>`).join('')}
+        ${t.result==='fail'&&bbRatio(t)<1?`<small class="muted">Расход уменьшен пропорционально времени: ${Math.round(bbRatio(t)*100)}% от модели.</small>`:''}`}
+      </div></div>`}).join(''):`<div class="empty" style="display:block">${bbTasks.length?'Все задания уже импортированы.':'Заданий не найдено.'}</div>`;
+  bbSelInfo()}
+function bbSelInfo(){const n=bbTasks.filter(t=>bbPick.get(t.id)?.on&&t.result!=='running'&&!bbImported(t.id)).length;$('bbSelInfo').textContent=n?`Выбрано: ${n}`:'Ничего не выбрано';$('bbImport').disabled=!n}
+async function bbLoad(){$('bbList').innerHTML='<div class="empty" style="display:block">Загрузка истории из Bambu Cloud…</div>';$('bbInfo').textContent='';
+  try{const dev=$('bbDevice').value;bbTasks=(await BB.tasks({deviceId:dev,limit:100})).sort((a,b)=>String(b.start).localeCompare(String(a.start)));
+    for(const t of bbTasks)if(!bbPick.has(t.id))bbPick.set(t.id,bbDefault(t));bbRender()}
+  catch(e){$('bbList').innerHTML=`<div class="empty" style="display:block">${escape(e.message)}</div>`;if(e.code==='auth'){bbStateUi()}$('bbImport').disabled=true}}
+async function bbOpen(){if(!BB.connected()){go('settings');setTimeout(()=>{$('bambuPanel').scrollIntoView({block:'start',behavior:'smooth'});(BB.proxy()?$('bbEmail'):$('bbProxy')).focus()},80);setStatus('Сначала подключите Bambu Lab Cloud');return}
+  const s=BB.state();$('bbPrinter').innerHTML=db.printers.map(p=>`<option value="${escape(p.id)}">${escape(p.name)}</option>`).join('');$('bbPrinter').value=db.printers.some(p=>p.id===s.printer)?s.printer:getPrinter('').id;
+  bbPick=new Map();bbTasks=[];$('bbList').innerHTML='<div class="empty" style="display:block">Подключение к Bambu Cloud…</div>';$('bbImport').disabled=true;$('bbDlg').showModal();
+  try{const ds=await BB.devices();$('bbDevice').innerHTML='<option value="">Все принтеры аккаунта</option>'+ds.map(d=>`<option value="${escape(d.id)}">${escape(d.name||d.model||d.id)}${d.model&&d.name!==d.model?' · '+escape(d.model):''}</option>`).join('');$('bbDevice').value=ds.some(d=>d.id===s.device)?s.device:''}catch{}
+  bbLoad()}
+$('bbOpen').onclick=bbOpen;$('bbOpen2').onclick=bbOpen;$('bbClose').onclick=()=>$('bbDlg').close();
+$('bbDlg').addEventListener('click',e=>{if(e.target===$('bbDlg'))$('bbDlg').close()});
+$('bbReload').onclick=bbLoad;$('bbShowDone').onchange=bbRender;
+$('bbDevice').onchange=()=>{BB.patch({device:$('bbDevice').value});bbLoad()};$('bbPrinter').onchange=()=>BB.patch({printer:$('bbPrinter').value});
+$('bbList').addEventListener('change',e=>{const row=e.target.closest('[data-bt]');if(!row)return;const st=bbPick.get(row.dataset.bt),f=e.target.dataset.bf,i=+e.target.dataset.i;if(!st)return;
+  if(f==='on'){st.on=e.target.checked;row.classList.toggle('on',st.on);bbSelInfo()}else if(f==='item')st.itemId=e.target.value;else if(f==='g')st.usage[i].grams=number(e.target.value);else if(f==='use')st.usage[i].pick=e.target.value});
+$('bbImport').onclick=()=>{const pid=$('bbPrinter').value,sel=bbTasks.filter(t=>bbPick.get(t.id)?.on&&t.result!=='running'&&!bbImported(t.id));if(!sel.length)return;
+  for(const t of sel){const st=bbPick.get(t.id),it=db.items.find(i=>i.id===st.itemId);
+    db.prints.push(normPrint({at:t.start||now(),date:bbDate(t.start),itemId:it?.id||'',itemName:it?.name||t.title,printerId:pid,hours:Math.round(t.seconds/36)/100,sets:1,result:t.result==='fail'?'fail':'ok',src:'bambu:'+t.id,
+      note:['Bambu Cloud',it&&bbNorm(it.name)!==bbNorm(t.title)?t.title:'',t.plate,t.estimated?'время по оценке слайсера':''].filter(Boolean).join(' · '),
+      usage:st.usage.filter(u=>u.grams>0).map(u=>{const[k,id]=u.pick.split(':');const s=k==='s'?getSpool(id):null;return{label:[u.f.type,u.f.slot].filter(Boolean).join(' · '),materialId:s?s.materialId:id||'',spoolId:s?s.id:'',grams:u.grams}})}))}
+  persist();renderList();if(currentPage==='item')renderItemPrints();$('bbDlg').close();setStatus(`Импортировано записей: ${sel.length}`)};
+bbStateUi();
 
 /* ================= Запуск ================= */
 (async()=>{

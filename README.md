@@ -52,6 +52,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Each record stores the print time. Success or failure is set with one button, and ↻ repeats a print with the same spools, grams and time.
 - "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
 - View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.
+- **Import from Bambu Lab Cloud** (P2S, P1S, X1, A1): your printer's print history is pulled into the log with real print time, result and per-AMS-slot filament usage. Items and spools are matched automatically by model name, filament type and color. Works through a free Cloudflare Worker, see [docs/bambu-cloud-setup.md](docs/bambu-cloud-setup.md).
 
 ### Statistics
 - Totals and averages, cost structure, by material, by month.
@@ -127,6 +128,19 @@ Short version:
 
 The app uses the `drive.file` scope, so it only sees files it created and has no access to the rest of your Drive. The Client ID is public by design. Sign-in lasts about an hour, and reconnecting takes one click. Changes made in the meantime are kept in the browser.
 
+## Bambu Lab Cloud import
+
+Print history lives in Bambu Lab's cloud. Browsers cannot call it directly (no CORS), so requests go through your own Cloudflare Worker ([`worker/bambu-proxy.js`](worker/bambu-proxy.js), free plan).
+
+**Step-by-step guide (in Russian): [docs/bambu-cloud-setup.md](docs/bambu-cloud-setup.md).**
+
+1. Cloudflare → Workers & Pages → Create Worker, paste `worker/bambu-proxy.js`, Deploy.
+2. Put the Worker URL into `js/config.js` (`bambuProxy`) or into Settings → Bambu Lab Cloud.
+3. Sign in with your Bambu Lab email and password plus the emailed code.
+4. Print log → ⇣ From Bambu Cloud.
+
+The password is never stored. The token (~3 months) stays in the browser only and is not written to the data file. The Bambu Lab API is unofficial.
+
 ## Running locally
 
 Google sign-in does not work from `file://`, so serve the folder over HTTP:
@@ -142,10 +156,13 @@ Then open http://localhost:8000. GitHub Pages: **Settings → Pages → Deploy f
 ```
 index.html                 markup
 css/style.css              styles, light and dark themes (CSS variables)
-js/config.js               settings: Google Client ID
+js/config.js               settings: Google Client ID, Bambu proxy URL
 js/gdrive.js               Google Drive storage
+js/bambu.js                Bambu Lab Cloud: sign-in and print history
+worker/bambu-proxy.js      Cloudflare Worker: CORS proxy to Bambu Cloud
 js/app.js                  application
 docs/google-drive-setup.md Google Drive setup guide (RU)
+docs/bambu-cloud-setup.md  Bambu Lab Cloud import guide (RU)
 manifest.webmanifest       install as an app
 ```
 
