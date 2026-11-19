@@ -416,3 +416,4 @@ details.save-more{margin:0}details.save-more>summary{font-size:15px;color:var(--
 .bb-foot{align-items:center;margin-top:12px}
 #bbState .ok{color:var(--ok-text)}
 @media(max-width:600px){.bb-row{grid-template-columns:24px 1fr}.bb-row .thumb{display:none}.bb-fil{grid-template-columns:auto 1fr 76px auto}.bb-fil select{grid-column:1/-1}}
+.pick-row.on{background:var(--sel)}
