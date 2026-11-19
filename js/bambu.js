@@ -87,7 +87,10 @@ window.Bambu = (() => {
 
   async function devices() {
     const d = await call('/v1/iot-service/api/user/bind');
-    return (d.devices || []).map(x => ({ id: String(x.dev_id || ''), name: String(x.name || ''), model: String(x.dev_product_name || x.dev_model_name || ''), online: !!x.online }));
+    return (d.devices || []).map(x => ({
+      id: String(x.dev_id || ''), name: String(x.name || ''), model: String(x.dev_product_name || x.dev_model_name || ''), online: !!x.online,
+      printStatus: String(x.print_status || ''), nozzle: x.nozzle_diameter != null ? String(x.nozzle_diameter) : '', structure: String(x.dev_structure || ''),
+    }));
   }
 
   /* История печати. status: 2 — завершено, 3 — прервано/ошибка, остальное — идёт сейчас. */
@@ -127,6 +130,34 @@ window.Bambu = (() => {
     };
   }
 
+  /* Прошивка: текущая версия и доступные обновления. */
+  async function deviceVersion(devId) {
+    const d = await call('/v1/iot-service/api/user/device/version?' + new URLSearchParams({ dev_id: devId }));
+    const dev = (d.devices || []).find(x => String(x.dev_id) === String(devId)) || (d.devices || [])[0] || {};
+    const cur = String(dev.version || '');
+    const fw = (Array.isArray(dev.firmware) ? dev.firmware : []).map(f => ({ version: String(f.version || ''), force: !!f.force_update, description: String(f.description || '') })).filter(f => f.version);
+    const upd = fw.find(f => f.version !== cur && cmpVer(f.version, cur) > 0) || null;
+    return { version: cur, update: upd };
+  }
+  const cmpVer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+
+  /* Текущая печать на принтерах аккаунта. */
+  async function currentPrint() {
+    const d = await call('/v1/iot-service/api/user/print?force=true');
+    return (d.devices || []).map(x => {
+      const prog = parseFloat(String(x.progress ?? '').replace('%', ''));
+      const pred = Number(x.prediction);
+      return {
+        id: String(x.dev_id || ''), online: x.dev_online !== false,
+        task: String(x.task_name || ''), status: String(x.task_status || ''),
+        progress: Number.isFinite(prog) ? prog : null,
+        remaining: Number.isFinite(pred) && pred > 0 ? pred : null, // секунды
+        start: x.start_time ? String(x.start_time) : '',
+        thumb: /^https:\/\//.test(x.thumbnail || '') ? x.thumbnail : '',
+      };
+    });
+  }
+
   /* Катушки Bambu Lab, которые AMS считал по RFID. Остаток — оценка AMS.
    * Уникального номера катушки API не отдаёт: ключ строится из серии, цвета и веса,
    * одинаковые катушки различаются порядковым номером. */
@@ -154,6 +185,6 @@ window.Bambu = (() => {
 
   return {
     state, patch, proxy, region, connected, expired,
-    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments,
+    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments, deviceVersion, currentPrint,
   };
 })();

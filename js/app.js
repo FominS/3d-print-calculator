@@ -7,7 +7,10 @@ const STATUSES={idea:'Идея',wip:'В работе',done:'Готово',publis
 const PARTS=[['plastic','Пластик','var(--s1)'],['power','Электричество','var(--s2)'],['depreciation','Амортизация','var(--s3)'],['maintenance','Обслуживание','var(--s4)'],['extra','Доп. затраты','var(--s5)']];
 const baseSettings={tariff:7,lowStock:200};
 const P0={id:'p2s',name:'Bambu Lab P2S',price:76990,years:5,annualHours:500,watts:120,maintenance:3};
-const normPrinter=p=>({id:String(p.id||shortId()),name:String(p.name||'Принтер').trim()||'Принтер',price:number(p.price),years:number(p.years)||5,annualHours:number(p.annualHours)||500,watts:number(p.watts),maintenance:number(p.maintenance)});
+const normPrinter=p=>({id:String(p.id||shortId()),name:String(p.name||'Принтер').trim()||'Принтер',price:number(p.price),years:number(p.years)||5,annualHours:number(p.annualHours)||500,watts:number(p.watts),maintenance:number(p.maintenance),
+  bambuDev:String(p.bambuDev||''),baseHours:number(p.baseHours),since:/^\d{4}-\d{2}-\d{2}$/.test(p.since||'')?p.since:'',
+  maint:p.maint&&typeof p.maint==='object'?Object.fromEntries(Object.entries(p.maint).filter(([,l])=>Array.isArray(l)).map(([k,l])=>[k,l.filter(e=>e&&/^\d{4}-\d{2}-\d{2}$/.test(e.date)).map(e=>({date:e.date,hours:number(e.hours),grams:number(e.grams)}))])):{},
+  maintCfg:p.maintCfg&&typeof p.maintCfg==='object'?Object.fromEntries(Object.entries(p.maintCfg).map(([k,c])=>[k,{...(number(c?.every)?{every:number(c.every)}:{}),...(c?.off?{off:true}:{})}])):{}});
 const baseMaterials=[{id:'petg',name:'PETG',price:1000},{id:'pla',name:'PLA',price:1000},{id:'abs',name:'ABS',price:1200}];
 
 const money=n=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB'}).format(n);
@@ -222,12 +225,15 @@ $('themeSel').onchange=()=>setTheme($('themeSel').value);
 applyTheme();
 
 /* ================= Навигация ================= */
-const PAGES=['home','calc','catalog','item','spools','spool','log','stats','settings'];let itemTab='overview',pendingPrint=false;let currentPage='';
+const PAGES=['home','calc','catalog','item','spools','spool','log','stats','settings','printer'];let itemTab='overview',pendingPrint=false;let currentPage='';
 function route(){
   let h=decodeURIComponent(location.hash.slice(1));
   if(h.startsWith('item/')){const [id,tab]=h.slice(5).split('/');if(db.items.some(i=>i.id===id)){const same=currentItemId===id&&currentPage==='item';currentItemId=id;itemTab=ITEM_TABS.includes(tab)?tab:'overview';show('item',same);renderItem();setItemTab(itemTab,false);if(pendingPrint){pendingPrint=false;openPrintForm();setTimeout(()=>$('printForm').scrollIntoView({block:'start',behavior:'smooth'}),60)}return}h='catalog'}
   if(h.startsWith('spool/')){const id=h.slice(6);if(getSpool(id)){currentSpoolId=id;currentItemId=null;show('spool');renderSpool();return}h='spools'}
-  currentItemId=null;currentSpoolId=null;show(PAGES.includes(h)&&!['item','spool'].includes(h)?h:'home');if(currentPage==='home')renderDash()}
+  if(h==='printer'||h.startsWith('printer/')){currentItemId=null;currentSpoolId=null;openPrinterPage(h.slice(8));return}
+  currentItemId=null;currentSpoolId=null;show(PAGES.includes(h)&&!['item','spool','printer'].includes(h)?h:'home');
+  if(currentPage==='home'){renderDash();cloudRefresh().then(()=>{if(currentPage==='home')renderDashPrinter()}).catch(()=>{})}
+  if(currentPage==='settings'){renderPrinters();if(BB.connected()&&!cloud.at)cloudRefresh().then(()=>renderPrinters()).catch(()=>{})}}
 function show(p,keepScroll){const changed=!keepScroll&&(p!==currentPage||p==='item'||p==='spool');document.body.classList.remove('more-open');closeMenus();currentPage=p;for(const x of PAGES)$('page-'+x).hidden=x!==p;document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===({item:'catalog',spool:'spools'}[p]||p)));if(changed)window.scrollTo({top:0})}
 const go=h=>{if(location.hash==='#'+h)route();else location.hash=h};
 
@@ -253,7 +259,7 @@ function renderMaterials(){{const mf=$('matFilter').value;$('matFilter').innerHT
   const selected=$('material').value;$('material').innerHTML=db.materials.map(m=>`<option value="${escape(m.id)}">${escape(m.name)} — ${money(number(m.price))}/кг</option>`).join('');if(db.materials.some(m=>m.id===selected))$('material').value=selected;
   $('materialsList').innerHTML=db.materials.map(m=>{const sp=db.spools.filter(s=>s.materialId===m.id&&s.price&&number(s.net));const avg=sp.length?sp.reduce((a,s)=>a+s.price/number(s.net)*1000,0)/sp.length:0;return`<div class="line matline"><span>${escape(m.name)}${avg&&Math.abs(avg-m.price)>=1?`<div><button class="linkbtn" data-applyprice="${escape(m.id)}" data-v="${Math.round(avg*100)/100}" title="Средняя цена купленных катушек">по катушкам: ${money(avg)}/кг ←</button></div>`:''}</span><span><input aria-label="Цена ${escape(m.name)}" data-mat="${escape(m.id)}" type="number" min="0" step="0.01" value="${number(m.price)}" style="width:100px;margin:0;padding:6px"> ₽/кг <input aria-label="Плотность ${escape(m.name)}" data-matdens="${escape(m.id)}" type="number" min="0.5" max="3" step="0.01" value="${m.density}" style="width:70px;margin:0 0 0 6px;padding:6px" title="Плотность, г/см³ — для пересчёта граммов в метры"> г/см³ <button class="danger" data-delmat="${escape(m.id)}" title="Удалить материал">×</button></span></div>`}).join('')}
 function renderPrinters(){const def=getPrinter('').id,used=id=>db.items.filter(i=>i.printerId===id).length+db.prints.filter(p=>p.printerId===id).length;
-  $('printersList').innerHTML=db.printers.map(P=>`<div class="part prcard" data-ptr="${escape(P.id)}"><div class="fields"><label class="wide">Название<input data-ptk="name" value="${escape(P.name)}"></label><label>Стоимость, ₽<input data-ptk="price" type="number" min="0" value="${P.price}"></label><label>Срок амортизации, лет<input data-ptk="years" type="number" min="0.5" step="0.5" value="${P.years}"></label><label>Часов печати в год<input data-ptk="annualHours" type="number" min="1" value="${P.annualHours}"></label><label>Средняя мощность, Вт<input data-ptk="watts" type="number" min="0" value="${P.watts}"></label><label>Обслуживание, ₽/ч<input data-ptk="maintenance" type="number" min="0" step="0.01" value="${P.maintenance}"></label></div><div class="prfoot"><label class="check" style="margin:0"><input type="radio" name="defPrinter" data-ptdef${P.id===def?' checked':''}> По умолчанию</label><span class="muted">Амортизация ${money(amortH(P))}/ч · с обслуживанием ${money(amortH(P)+number(P.maintenance))}/ч</span>${db.printers.length>1?`<button class="iconbtn danger" data-ptdel title="${used(P.id)?'Используется: '+used(P.id):'Удалить принтер'}">Удалить</button>`:''}</div></div>`).join('');
+  $('printersList').innerHTML=db.printers.map(P=>`<div class="part prcard" data-ptr="${escape(P.id)}"><div class="fields"><label class="wide">Название<input data-ptk="name" value="${escape(P.name)}"></label><label>Стоимость, ₽<input data-ptk="price" type="number" min="0" value="${P.price}"></label><label>Срок амортизации, лет<input data-ptk="years" type="number" min="0.5" step="0.5" value="${P.years}"></label><label>Часов печати в год<input data-ptk="annualHours" type="number" min="1" value="${P.annualHours}"></label><label>Средняя мощность, Вт<input data-ptk="watts" type="number" min="0" value="${P.watts}"></label><label>Обслуживание, ₽/ч<input data-ptk="maintenance" type="number" min="0" step="0.01" value="${P.maintenance}"></label><label>Принтер в Bambu Cloud<select data-ptk="bambuDev">${bambuDevOptions(P.bambuDev)}</select></label><label>Наработка до начала учёта, ч<input data-ptk="baseHours" type="number" min="0" step="1" value="${P.baseHours||''}" placeholder="0"></label><label>В работе с<input data-ptk="since" type="date" value="${escape(P.since)}"></label></div><div class="prfoot"><label class="check" style="margin:0"><input type="radio" name="defPrinter" data-ptdef${P.id===def?' checked':''}> По умолчанию</label><span class="muted">Амортизация ${money(amortH(P))}/ч · с обслуживанием ${money(amortH(P)+number(P.maintenance))}/ч · <a class="lnk" href="#printer/${escape(P.id)}">наработка и обслуживание →</a></span>${db.printers.length>1?`<button class="iconbtn danger" data-ptdel title="${used(P.id)?'Используется: '+used(P.id):'Удалить принтер'}">Удалить</button>`:''}</div></div>`).join('');
   const cp=$('calcPrinter').value;$('calcPrinter').innerHTML=printerOptions(cp);$('calcPrinter').value=db.printers.some(p=>p.id===cp)?cp:''}
 function renderAll(){renderMaterials();renderPrinters();renderLibs();renderCalcProtos();renderCalc();renderList();if(currentPage)route()}
 
@@ -303,7 +309,7 @@ function renderRows(list){
 function renderList(){const fl=filtered();renderRows(fl);renderCards(fl);$('catCards').hidden=catView!=='cards'||!fl.length;$('catTable').hidden=catView!=='table'||!fl.length;$('catSub').textContent=db.items.length?`Всего: ${db.items.length}${fl.length!==db.items.length?` · показано: ${fl.length}`:''}`:'Каталог ваших моделей';if(currentPage==='home')renderDash();renderStats();renderSpools();renderLog();$('navCount').textContent=db.items.length||''}
 
 /* ================= Статистика ================= */
-function renderStats(){
+function renderStats(){renderStatPrinters();
   const f=$('statMat').value,list=f?db.items.filter(x=>itemMaterials(x).includes(f)):db.items;
   $('statsScope').textContent=f?`Изделия с материалом ${getMat(f).name}: ${list.length} из ${db.items.length}`:`Все изделия каталога: ${db.items.length}`;
   $('statsEmpty').hidden=list.length>0;$('statsBody').hidden=!list.length;if(!list.length)return;
@@ -726,7 +732,7 @@ function vChart(cols,metric){// cols: [{label,tip,ok,fail,cost}]
     return`<div class="vc-col" tabindex="0" data-tip="${escape(c.tip)}">${fH?`<div class="vc-bar fail" style="height:${fH}%"></div>`:''}${okH?`<div class="vc-bar" style="height:${okH}%"></div>`:''}</div>`}).join('')}</div></div>
   <div class="vc-x">${cols.map((c,i)=>`<span>${showX(i)?escape(c.label):''}</span>`).join('')}</div></div>
   <div class="vc-legend">${metric==='cost'?'<span><i style="background:var(--s1)"></i>Себестоимость печатей, ₽</span>':'<span><i style="background:var(--s1)"></i>✓ Успешные</span><span><i style="background:var(--neg)"></i>✕ Неудачные</span>'}</div>`}
-function renderDash(){
+function renderDash(){renderDashPrinter();
   $('dType').value=dash.type;$('dLabel').textContent=dashLabel();$('dPrev').disabled=dash.type==='all';$('dNext').disabled=isFuture();
   const list=db.prints.filter(inDash),S={n:list.length,ok:0,fail:0,sets:0,hours:0,grams:0,plastic:0,power:0,depreciation:0,maintenance:0,total:0,failCost:0,items:new Set(),byMat:{}};
   for(const p of list){const c=printCalc(p);if(p.result==='fail'){S.fail++;S.failCost+=c.total}else{S.ok++;S.sets+=p.sets;S.items.add(p.itemId)}S.hours+=c.hours;S.grams+=c.grams;for(const k of ['plastic','power','depreciation','maintenance','total'])S[k]+=c[k];for(const [m,v] of Object.entries(c.byMat)){const b=S.byMat[m]??={grams:0,cost:0};b.grams+=v.grams;b.cost+=v.cost}}
@@ -799,7 +805,8 @@ $('materialsList').onclick=e=>{const ap=e.target.dataset.applyprice;if(ap){getMa
 
 
 $('printersList').addEventListener('change',e=>{const card=e.target.closest('[data-ptr]');if(!card)return;const P=db.printers.find(p=>p.id===card.dataset.ptr);if(!P)return;const k=e.target.dataset.ptk;
-  if(k){P[k]=k==='name'?(e.target.value.trim()||P.name):number(e.target.value);if(k==='years'&&!P.years)P.years=5;if(k==='annualHours'&&!P.annualHours)P.annualHours=500}
+  if(k==='bambuDev'||k==='since'){P[k]=e.target.value;if(k==='bambuDev'){for(const x of db.printers)if(x!==P&&P.bambuDev&&x.bambuDev===P.bambuDev)x.bambuDev='';cloud.at=0}}
+  else if(k){P[k]=k==='name'?(e.target.value.trim()||P.name):number(e.target.value);if(k==='years'&&!P.years)P.years=5;if(k==='annualHours'&&!P.annualHours)P.annualHours=500}
   else if(e.target.dataset.ptdef!==undefined)db.settings.defaultPrinter=P.id;else return;
   persist();renderAll()});
 $('printersList').addEventListener('click',e=>{const b=e.target.closest('[data-ptdel]');if(!b)return;const id=b.closest('[data-ptr]').dataset.ptr,P=db.printers.find(p=>p.id===id);const n=db.items.filter(i=>i.printerId===id).length;
@@ -910,7 +917,7 @@ async function bbOpen(){if(!BB.connected()){go('settings');setTimeout(()=>{$('ba
 $('bbOpen').onclick=bbOpen;$('bbOpen2').onclick=bbOpen;$('bbClose').onclick=()=>$('bbDlg').close();
 $('bbDlg').addEventListener('click',e=>{if(e.target===$('bbDlg'))$('bbDlg').close()});
 $('bbReload').onclick=bbLoad;$('bbShowDone').onchange=bbRender;
-$('bbDevice').onchange=()=>{BB.patch({device:$('bbDevice').value});bbLoad()};$('bbPrinter').onchange=()=>BB.patch({printer:$('bbPrinter').value});
+$('bbDevice').onchange=()=>{BB.patch({device:$('bbDevice').value});const lp=db.printers.find(p=>p.bambuDev&&p.bambuDev===$('bbDevice').value);if(lp){$('bbPrinter').value=lp.id;BB.patch({printer:lp.id})}bbLoad()};$('bbPrinter').onchange=()=>BB.patch({printer:$('bbPrinter').value});
 $('bbList').addEventListener('change',e=>{const row=e.target.closest('[data-bt]');if(!row)return;const st=bbPick.get(row.dataset.bt),f=e.target.dataset.bf,i=+e.target.dataset.i;if(!st)return;
   if(f==='on'){st.on=e.target.checked;row.classList.toggle('on',st.on);bbSelInfo()}else if(f==='item')st.itemId=e.target.value;else if(f==='g')st.usage[i].grams=number(e.target.value);else if(f==='use')st.usage[i].pick=e.target.value});
 $('bbImport').onclick=()=>{const pid=$('bbPrinter').value,sel=bbTasks.filter(t=>bbPick.get(t.id)?.on&&t.result!=='running'&&!bbImported(t.id));if(!sel.length)return;
@@ -1009,6 +1016,152 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-linkprint]
 $('linkSearch').oninput=renderLinkList;$('linkClose').onclick=()=>$('linkDlg').close();
 $('linkDlg').addEventListener('click',e=>{if(e.target===$('linkDlg')){$('linkDlg').close();return}const b=e.target.closest('[data-linkto]');if(b)linkPrint(linkPid,b.dataset.linkto)});
 $('linkNone').onclick=()=>linkPrint(linkPid,'');$('linkNew').onclick=()=>itemFromPrint(linkPid);
+
+/* ================= Принтер: наработка, обслуживание, Bambu Cloud ================= */
+// Регламент Bambu Lab для P2S (wiki.bambulab.com/en/p2s, раздел Maintenance).
+const WIKI='https://wiki.bambulab.com/en/p2s/maintenance/';
+const MAINT=[
+  {id:'xy',name:'Очистка и смазка осей X и Y',kind:'days',tier:[30,60,90],how:'Протереть валы, по 1–2 капли масла на каждые 5 см (не смазку!), медленно прогнать голову 3–5 раз. Затем полная калибровка.',url:WIKI+'lubricate-x-y-z-axis'},
+  {id:'z',name:'Очистка и смазка оси Z',kind:'days',tier:[90,120,150],how:'Очистить ходовые винты и направляющие спиртом; винты — смазка, направляющие — масло; прогнать стол 3–5 раз. Затем полная калибровка.',url:WIKI+'lubricate-x-y-z-axis'},
+  {id:'idler',name:'Смазка натяжных роликов XY',kind:'days',every:90,how:'По 1–2 капли масла в стык оси и подшипника. Bambu Lab рекомендует раз в 3–6 месяцев. Затем полная калибровка.',url:WIKI+'idler-pulley-lubrication'},
+  {id:'filter',name:'Замена воздушного (угольного) фильтра',kind:'hours',every:1440,how:'Примерно через 1440 ч печати или раньше при сильном загрязнении.',url:WIKI+'replace-air-filter'},
+  {id:'cutter',name:'Проверка ножа филамента',kind:'kg',every:8,abrasive:4,how:'Каждые 8–12 катушек; для абразивных (PA-CF, PA-GF, PPA-CF) — каждые 4–10. Заменить лезвие, если затупилось.',url:WIKI+'period-maintenance'},
+  {id:'camera',name:'Очистка камеры',kind:'days',every:180,how:'Протереть объектив от налёта — иначе картинка мутнеет.',url:WIKI+'period-maintenance'},
+  {id:'nozzle',name:'Очистка сопла и нагревательного блока',kind:'cond',how:'Нагреть до 250 °C, снять и протереть сопло, затем блок. В термоперчатках.',url:WIKI+'period-maintenance'},
+  {id:'fans',name:'Очистка вентиляторов головы',kind:'cond',how:'Обдув модели и вентилятор хотэнда — при падении оборотов или шуме.',url:WIKI+'period-maintenance'},
+  {id:'extruder',name:'Очистка и смазка шестерён экструдера',kind:'cond',how:'При проскальзывании или засоре. Немного смазки на шестерни — без излишков.',url:WIKI+'period-maintenance'},
+  {id:'pad',name:'Замена протирочной площадки сопла',kind:'cond',how:'При повреждении или деформации.',url:WIKI+'period-maintenance'},
+  {id:'buffer',name:'Очистка буфера филамента',kind:'cond',how:'При частых ошибках буфера во время печати.',url:WIKI+'p2s-buffer-cleaning'},
+  {id:'belts',name:'Натяжение ремней',kind:'cond',how:'Принтер сам контролирует натяжение и напомнит, когда подтянуть.',url:WIKI+'belt-tension'},
+];
+const ABRASIVE=/(^|[^a-z])(cf|gf)([^a-z]|$)|carbon|glass|абраз/i;
+const dayMs=864e5,dDiff=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/dayMs);
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
+const ruDate=d=>{const x=new Date(d+'T12:00:00');return isNaN(x)?d:x.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})};
+// Печати и прототипы по принтеру: дата, часы, граммы, абразив
+function printerUsage(P){const ev=[];let ok=0,fail=0,failCost=0,cost=0;
+  for(const p of db.prints){const it=db.items.find(i=>i.id===p.itemId);if(getPrinter(p.printerId||it?.printerId).id!==P.id)continue;const c=printCalc(p);
+    ev.push({date:p.date,hours:c.hours,grams:c.grams,abr:p.usage.some(u=>ABRASIVE.test(getMat(u.materialId||getSpool(u.spoolId)?.materialId).name)),print:true,fail:p.result==='fail'});
+    cost+=c.total;if(p.result==='fail'){fail++;failCost+=c.total}else ok++}
+  for(const it of db.items){if(getPrinter(it.printerId).id!==P.id)continue;for(const pr of it.prototypes)if(pr.date&&(number(pr.hours)||number(pr.grams)))ev.push({date:pr.date,hours:number(pr.hours),grams:number(pr.grams),abr:ABRASIVE.test(getMat(pr.materialId).name)})}
+  ev.sort((a,b)=>a.date.localeCompare(b.date));
+  const logged=ev.reduce((a,e)=>a+e.hours,0),grams=ev.reduce((a,e)=>a+e.grams,0),first=P.since||ev[0]?.date||'';
+  const t=today(),from=addDays(t,-60),span=Math.max(14,Math.min(60,first?dDiff(t,first)+1:60)),recent=ev.filter(e=>e.date>=from).reduce((a,e)=>a+e.hours,0);
+  const perDay=recent/span,tier=perDay>=5?0:perDay>=1?1:2;
+  return{ev,logged,hours:number(P.baseHours)+logged,grams,first,perDay,tier,ok,fail,failCost,cost,prints:ok+fail}}
+const maintLog=(P,id)=>Array.isArray(P.maint?.[id])?P.maint[id]:[];
+const maintCfg=(P,id)=>P.maintCfg?.[id]||{};
+function maintEvery(P,T,U){const c=maintCfg(P,T.id);if(number(c.every))return number(c.every);if(T.tier)return T.tier[U.tier];if(T.kind==='kg'){const last=maintLog(P,T.id).at(-1)?.date||'';return U.ev.some(e=>e.abr&&e.date>=last)?T.abrasive:T.every}return T.every}
+function maintState(P,T,U){const last=maintLog(P,T.id).at(-1),cfg=maintCfg(P,T.id),t=today();
+  if(cfg.off)return{T,last,off:true,st:'off'};if(T.kind==='cond')return{T,last,st:'cond'};
+  const every=maintEvery(P,T,U),refDate=last?.date||U.first||t;let used,unit,left,due='';
+  if(T.kind==='days'){used=Math.max(0,dDiff(t,refDate));unit='дн.';left=every-used;due=addDays(refDate,every)}
+  else if(T.kind==='hours'){used=Math.max(0,U.hours-(last?number(last.hours):0));unit='ч';left=every-used}
+  else{used=Math.max(0,U.grams-(last?number(last.grams):0))/1000;unit='кг';left=every-used}
+  const r=every?used/every:0;return{T,last,every,used,unit,left,due,r,st:r>=1?'over':r>=.8?'soon':'ok'}}
+const maintAll=(P,U=printerUsage(P))=>MAINT.map(T=>maintState(P,T,U));
+const MST={over:['Пора','fail'],soon:['Скоро','wip'],ok:['В норме','done'],cond:['По состоянию','sp-empty'],off:['Не отслеживается','sp-empty']};
+function leftText(s){if(s.st==='cond'||s.st==='off')return'';const f=v=>s.unit==='кг'?fmt(v,1):fmt(v,0);
+  if(s.left<0)return`просрочено на ${f(-s.left)} ${s.unit}`;return`осталось ${f(s.left)} ${s.unit}${s.due?` · до ${ruDate(s.due)}`:''}`}
+const usedText=s=>s.st==='cond'||s.st==='off'?'':`${s.unit==='кг'?fmt(s.used,1):fmt(s.used,0)} из ${fmt(s.every,s.unit==='кг'?1:0)} ${s.unit}${s.unit==='кг'?' (≈ катушек)':''}`;
+const TIER_TXT=['≥ 5 ч в день','1–5 ч в день','< 1 ч в день'];
+
+/* --- данные Bambu Cloud по принтерам (кэш в памяти) --- */
+let cloud={at:0,busy:null,devices:[],print:[],ver:{},err:'',newTasks:null};
+async function cloudRefresh(force){if(!BB.connected()||!BB.proxy())return cloud;if(cloud.busy)return cloud.busy;if(!force&&Date.now()-cloud.at<180e3)return cloud;
+  cloud.busy=(async()=>{const linked=[...new Set(db.printers.map(P=>P.bambuDev).filter(Boolean))];
+    const [dv,pr,tk]=await Promise.allSettled([BB.devices(),linked.length?BB.currentPrint():Promise.resolve([]),BB.tasks({limit:100})]);
+    if(dv.status==='fulfilled')cloud.devices=dv.value;if(pr.status==='fulfilled')cloud.print=pr.value;
+    if(tk.status==='fulfilled')cloud.newTasks=tk.value.filter(t=>t.result!=='running'&&!bbImported(t.id)).length;
+    const vs=await Promise.allSettled(linked.map(id=>BB.deviceVersion(id)));linked.forEach((id,i)=>{if(vs[i].status==='fulfilled')cloud.ver[id]=vs[i].value});
+    const bad=[dv,pr,tk,...vs].find(x=>x.status==='rejected');cloud.err=bad?bad.reason?.message||'Ошибка Bambu Cloud':'';cloud.at=Date.now();return cloud})().finally(()=>{cloud.busy=null});
+  return cloud.busy}
+const cloudDev=P=>P.bambuDev?cloud.devices.find(d=>d.id===P.bambuDev):null;
+const cloudPrint=P=>P.bambuDev?cloud.print.find(d=>d.id===P.bambuDev):null;
+function cloudLine(P){const d=cloudDev(P),p=cloudPrint(P),v=cloud.ver[P.bambuDev];if(!P.bambuDev||!cloud.at)return'';const parts=[];
+  if(d)parts.push(d.online?'<span class="dot on"></span>в сети':'<span class="dot"></span>не в сети');
+  if(p&&p.task&&p.progress!=null&&p.progress<100&&!/finish|fail|idle/i.test(p.status))parts.push(`печатает «${escape(p.task)}» · ${fmt(p.progress,0)}%${p.remaining?` · осталось ${fmtH(p.remaining/3600)}`:''}`);
+  if(v?.update)parts.push(`<span class="pill wip">прошивка ${escape(v.update.version)}${v.update.force?' — обязательная':''}</span>`);
+  return parts.join(' · ')}
+
+/* --- страница «Принтер» --- */
+const PR_TABS=['state','maint','stats'];let prId='',prTab='state';
+const curPrinter=()=>db.printers.find(p=>p.id===prId)||getPrinter('');
+function setPrTab(t,push=true){prTab=PR_TABS.includes(t)?t:'state';document.querySelectorAll('#page-printer [data-prpane]').forEach(p=>p.hidden=p.dataset.prpane!==prTab);document.querySelectorAll('#prTabs [data-tab]').forEach(b=>{b.classList.toggle('on',b.dataset.tab===prTab);b.setAttribute('aria-selected',b.dataset.tab===prTab)});if(push)history.replaceState(null,'','#printer/'+curPrinter().id+(prTab==='state'?'':'/'+prTab))}
+function renderPrinterPage(){const P=curPrinter();prId=P.id;const U=printerUsage(P),M=maintAll(P,U),d=cloudDev(P);
+  $('prSel').innerHTML=db.printers.map(x=>`<option value="${escape(x.id)}"${x.id===P.id?' selected':''}>${escape(x.name)}</option>`).join('');$('prSel').hidden=db.printers.length<2;
+  $('prTitle').textContent=P.name;$('prMeta').innerHTML=[d?escape(d.model||d.name):'',d?.nozzle?`сопло ${escape(d.nozzle)} мм`:'',`наработка ${fmtH(U.hours)}`,cloudLine(P)].filter(Boolean).join(' · ');
+  const over=M.filter(s=>s.st==='over').length,soon=M.filter(s=>s.st==='soon').length;$('prTabMaintN').textContent=over||soon||'';$('prTabMaintN').className='tabn'+(over?' bad':soon?' warn':'');
+  // Состояние
+  const life=number(P.years)*number(P.annualHours),v=cloud.ver[P.bambuDev],cp=cloudPrint(P);
+  const tiles=[['Наработка',fmtH(U.hours),number(P.baseHours)?`${fmtH(U.logged)} по журналу + ${fmtH(number(P.baseHours))} до учёта`:'по журналу печати и прототипам'],
+    ['Загрузка',`${fmt(U.perDay,1)} ч/день`,`за последние 60 дней · ${TIER_TXT[U.tier]}`],['Печатей',fmt(U.prints,0),U.prints?`✓ ${U.ok} · ✕ ${U.fail} · успешных ${Math.round(U.ok/U.prints*100)}%`:''],
+    ['Ресурс амортизации',life?fmt(U.hours/life*100,1)+'%':'—',life?`${fmt(U.hours,0)} из ${fmt(life,0)} ч`:''],['Филамент',U.grams>=1000?fmt(U.grams/1000,2)+' кг':fmt(U.grams,0)+' г',U.hours?`${fmt(U.grams/U.hours,1)} г/ч`:''],['В работе с',U.first?ruDate(U.first):'—',U.first?`${fmt(dDiff(today(),U.first),0)} дн.`:'']];
+  $('prTiles').innerHTML=tiles.map(([l,v,s])=>`<div class="stat"><span class="muted">${l}</span><strong>${v}</strong>${s?`<small>${s}</small>`:''}</div>`).join('');
+  let cl='';if(!BB.connected())cl=`<p class="muted" style="margin:0">Подключите Bambu Lab Cloud в <a class="lnk" href="#settings">настройках</a>, чтобы видеть статус, текущую печать и обновления прошивки.</p>`;
+  else if(!P.bambuDev){const free=cloud.devices.filter(x=>!db.printers.some(y=>y.bambuDev===x.id));cl=`<p class="muted" style="margin:0 0 10px">Принтер не связан с Bambu Cloud.</p>${free.length?`<div class="buttons" style="margin:0">${free.map(x=>`<button class="secondary" data-prlink="${escape(x.id)}">Связать с «${escape(x.name||x.model)}»${x.model&&x.name!==x.model?' · '+escape(x.model):''}</button>`).join('')}</div>`:cloud.at?'<p class="muted">Свободных принтеров в аккаунте нет.</p>':'<p class="muted">Загрузка списка принтеров…</p>'}`}
+  else{const rows=[['Принтер',d?`${escape(d.name)} · ${escape(d.model)}`:'не найден в аккаунте'],['Статус',d?(d.online?'<span class="dot on"></span>в сети':'<span class="dot"></span>не в сети')+(d.printStatus?` · ${escape(d.printStatus)}`:''):'—'],['Сопло',d?.nozzle?escape(d.nozzle)+' мм':'—'],
+      ['Текущая печать',cp&&cp.task?`${escape(cp.task)}${cp.progress!=null?` · ${fmt(cp.progress,0)}%`:''}${cp.remaining?` · осталось ${fmtH(cp.remaining/3600)}`:''}`:'нет'],
+      ['Прошивка',v?`${escape(v.version||'—')}${v.update?` → <b>доступна ${escape(v.update.version)}</b>${v.update.force?' (обязательная)':''}`:' · последняя'}`:'—'],
+      ['Новых заданий в облаке',cloud.newTasks==null?'—':cloud.newTasks?`${cloud.newTasks} · <a class="lnk" href="#log" data-bbopen>импортировать →</a>`:'нет']];
+    cl=`<div class="breakdown" style="margin-top:0">${rows.map(([a,b])=>`<div class="line"><span>${a}</span><span style="text-align:right">${b}</span></div>`).join('')}</div>${v?.update?.description?`<details class="more"><summary>Что нового в ${escape(v.update.version)}</summary><div class="muted" style="white-space:pre-wrap">${escape(v.update.description.replace(/<[^>]+>/g,'')).slice(0,3000)}</div></details>`:''}${cp?.thumb?`<img class="prthumb" src="${escape(cp.thumb)}" alt="" referrerpolicy="no-referrer">`:''}`}
+  $('prCloud').innerHTML=(cloud.err&&BB.connected()?`<div class="notice" style="margin-bottom:10px">${escape(cloud.err)}</div>`:'')+cl;
+  const next=M.filter(s=>s.st==='over'||s.st==='soon').sort((a,b)=>b.r-a.r);
+  $('prNext').innerHTML=next.length?next.map(maintRowMini).join(''):'<p class="muted" style="margin:0">Все регламентные работы в норме.</p>';
+  // Обслуживание
+  $('prMaintSub').textContent=`Интервалы смазки подобраны по загрузке: ${fmt(U.perDay,1)} ч/день (${TIER_TXT[U.tier]}). Наработка ${fmtH(U.hours)}.${M.some(x=>!x.last&&x.st!=='cond'&&x.st!=='off')?` Для работ без отметок отсчёт идёт от ${U.first?ruDate(U.first):'сегодня'} (поле «В работе с» в настройках принтера) — отметьте, когда вы их делали в последний раз: «История и настройка» → дата.`:''}`;
+  $('prMaint').innerHTML=M.map(s=>maintRow(P,s)).join('');updNavPrinter();
+  // Статистика
+  const by=new Map();for(const e of U.ev){const k=e.date.slice(0,7),m=by.get(k)||{hours:0,grams:0,n:0,fail:0};m.hours+=e.hours;m.grams+=e.grams;if(e.print){m.n++;if(e.fail)m.fail++}by.set(k,m)}
+  const ms=[...by.entries()].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,12),mx=Math.max(0,...ms.map(([,m])=>m.hours));
+  $('prMonths').innerHTML=ms.length?ms.map(([k,m])=>`<tr><td>${MONTHS[+k.slice(5,7)-1]} ${k.slice(0,4)}</td><td class="num">${fmtH(m.hours)}</td><td class="num">${m.n}</td><td class="num">${m.n?Math.round((m.n-m.fail)/m.n*100)+'%':'—'}</td><td class="num">${fmt(m.grams,0)} г</td><td style="width:30%"><div class="minibar"><div style="width:${mx?m.hours/mx*100:0}%"></div></div></td></tr>`).join(''):'<tr><td colspan="6" class="muted">Печатей на этом принтере пока нет.</td></tr>';
+  $('prStatTiles').innerHTML=[['Средняя печать',U.prints?fmtH(U.ev.filter(e=>e.print).reduce((a,e)=>a+e.hours,0)/U.prints):'—'],['Себестоимость печатей',money(U.cost)],['Потери на неудачных',money(U.failCost)],['Электроэнергия',fmt(U.logged*number(P.watts)/1000,1)+' кВт·ч']].map(([l,v])=>`<div class="stat"><span class="muted">${l}</span><strong>${v}</strong></div>`).join('')}
+const maintBar=s=>s.st==='cond'||s.st==='off'?'':`<div class="minibar mbar ${s.st}"><div style="width:${Math.min(100,s.r*100)}%"></div></div>`;
+const maintRowMini=s=>`<div class="mt-row mini"><span class="pill ${MST[s.st][1]}">${MST[s.st][0]}</span><div><b>${escape(s.T.name)}</b><div class="muted" style="font-size:12px">${leftText(s)}</div></div></div>`;
+function maintRow(P,s){const T=s.T,log=maintLog(P,T.id),cfg=maintCfg(P,T.id);
+  return`<div class="mt-row" data-mt="${T.id}"><div class="mhead"><span class="pill ${MST[s.st][1]}">${MST[s.st][0]}</span><div class="mmain"><b>${escape(T.name)}</b><div class="muted" style="font-size:12.5px">${escape(T.how)} <a class="lnk" href="${T.url}" target="_blank" rel="noopener">Инструкция ↗</a></div>
+    <div class="tl-meta">${s.last?`<span>последний раз ${ruDate(s.last.date)}${T.kind==='hours'?` · на ${fmt(number(s.last.hours),0)} ч`:''}</span>`:'<span>ещё не отмечалось</span>'}${usedText(s)?`<span>${usedText(s)}</span>`:''}${leftText(s)?`<span><b>${leftText(s)}</b></span>`:''}</div>${maintBar(s)}</div>
+    <button type="button" class="secondary small" data-mdone>✓ Выполнено</button></div>
+    <details class="more mset"><summary>История и настройка</summary>
+      ${log.length?`<div class="breakdown" style="margin-top:0">${log.slice().reverse().map((e,i)=>`<div class="line"><span>${ruDate(e.date)}</span><span>${fmt(number(e.hours),0)} ч <button type="button" class="iconbtn danger" data-mdel="${log.length-1-i}" title="Удалить запись">×</button></span></div>`).join('')}</div>`:'<p class="muted" style="margin:0">Записей нет.</p>'}
+      <div class="fields" style="margin-top:8px"><label>Выполнено (дата)<input type="date" data-mdate value="${today()}"></label>${T.kind==='cond'?'':`<label>Интервал, ${T.kind==='days'?'дней':T.kind==='hours'?'часов':'кг (катушек)'}<input type="number" min="0" step="${T.kind==='kg'?'0.5':'1'}" data-mevery value="${number(cfg.every)||''}" placeholder="${T.tier?'авто: '+T.tier.join(' / '):T.every}"></label>`}</div>
+      <div class="buttons"><button type="button" class="secondary small" data-madd>+ Отметить выполнение этой датой</button><label class="check" style="margin:0"><input type="checkbox" data-moff${cfg.off?' checked':''}> Не отслеживать</label></div></details></div>`}
+function maintDone(P,id,date){const U=printerUsage(P),before=U.ev.filter(e=>e.date<=date);P.maint??={};const l=(P.maint[id]??=[]);
+  l.push({date,hours:Math.round((number(P.baseHours)+before.reduce((a,e)=>a+e.hours,0))*100)/100,grams:Math.round(before.reduce((a,e)=>a+e.grams,0))});l.sort((a,b)=>a.date.localeCompare(b.date));if(l.length>30)l.splice(0,l.length-30);
+  persist();renderPrinterPage();if(currentPage==='home')renderDash();setStatus('Обслуживание отмечено')}
+$('prMaint').addEventListener('click',e=>{const row=e.target.closest('[data-mt]');if(!row)return;const P=curPrinter(),id=row.dataset.mt;
+  if(e.target.closest('[data-mdone]'))maintDone(P,id,today());
+  else if(e.target.closest('[data-madd]')){const d=row.querySelector('[data-mdate]').value;if(!d)return;if(d>today()){alert('Дата не может быть в будущем');return}maintDone(P,id,d);setTimeout(()=>{const r=$('prMaint').querySelector(`[data-mt="${id}"] details`);if(r)r.open=true},0)}
+  else{const del=e.target.closest('[data-mdel]');if(del&&confirm('Удалить запись об обслуживании?')){maintLog(P,id).splice(+del.dataset.mdel,1);persist();renderPrinterPage();setTimeout(()=>{const r=$('prMaint').querySelector(`[data-mt="${id}"] details`);if(r)r.open=true},0)}}});
+$('prMaint').addEventListener('change',e=>{const row=e.target.closest('[data-mt]');if(!row)return;const P=curPrinter(),id=row.dataset.mt;P.maintCfg??={};const c=(P.maintCfg[id]??={});
+  if(e.target.matches('[data-mevery]'))c.every=number(e.target.value)||undefined;else if(e.target.matches('[data-moff]'))c.off=e.target.checked||undefined;else return;
+  if(!c.every&&!c.off)delete P.maintCfg[id];persist();renderPrinterPage();setTimeout(()=>{const r=$('prMaint').querySelector(`[data-mt="${id}"] details`);if(r)r.open=true},0)});
+$('prTabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)setPrTab(b.dataset.tab)};
+$('prSel').onchange=()=>{prId=$('prSel').value;go('printer/'+prId+(prTab==='state'?'':'/'+prTab))};
+$('prRefresh').onclick=async()=>{if(!BB.connected()){go('settings');return}$('prRefresh').disabled=true;try{await cloudRefresh(true)}finally{$('prRefresh').disabled=false}renderPrinterPage();if(cloud.err)setStatus(cloud.err)};
+$('page-printer').addEventListener('click',e=>{const l=e.target.closest('[data-prlink]');if(l){const P=curPrinter();P.bambuDev=l.dataset.prlink;persist();cloud.at=0;cloudRefresh(true).then(renderPrinterPage);renderPrinterPage();setStatus('Принтер связан с Bambu Cloud')}
+  if(e.target.closest('[data-bbopen]')){e.preventDefault();bbOpen()}
+  const tg=e.target.closest('[data-tabgo]');if(tg)setPrTab(tg.dataset.tabgo)});
+function openPrinterPage(rest){const [id,tab]=String(rest||'').split('/');prId=db.printers.some(p=>p.id===id)?id:getPrinter('').id;show('printer');setPrTab(tab||'state',false);renderPrinterPage();
+  cloudRefresh().then(()=>{if(currentPage==='printer')renderPrinterPage()}).catch(()=>{})}
+
+/* --- карточка принтера на главной --- */
+function renderDashPrinter(){const list=db.printers.filter(P=>P.id===getPrinter('').id||printerUsage(P).ev.length);
+  $('dPrinter').innerHTML=list.map(P=>{const U=printerUsage(P),M=maintAll(P,U),next=M.filter(s=>s.st==='over'||s.st==='soon').sort((a,b)=>b.r-a.r),line=cloudLine(P);
+    return`<div class="dpr"><div class="dpr-head"><div><a href="#printer/${escape(P.id)}" class="lnk"><b>${escape(P.name)}</b></a><div class="muted" style="font-size:12.5px">${line||'наработка по журналу печати'}</div></div><div class="dpr-h"><strong>${fmtH(U.hours)}</strong><small class="muted">наработка · ${fmt(U.perDay,1)} ч/день</small></div></div>
+      ${next.length?next.slice(0,3).map(maintRowMini).join(''):'<p class="muted" style="margin:6px 0 0">✓ Регламентные работы в норме</p>'}
+      <div class="dpr-foot"><a href="#printer/${escape(P.id)}/maint" class="lnk">Обслуживание →</a>${cloud.newTasks?`<a href="#log" class="lnk" data-bbopen>В Bambu Cloud новых заданий: ${cloud.newTasks} →</a>`:''}</div></div>`}).join('')}
+$('dPrinter').addEventListener('click',e=>{if(e.target.closest('[data-bbopen]')){e.preventDefault();bbOpen()}});
+
+/* --- таблица принтеров в статистике --- */
+function renderStatPrinters(){const rows=db.printers.map(P=>{const U=printerUsage(P),life=number(P.years)*number(P.annualHours),M=maintAll(P,U),over=M.filter(s=>s.st==='over').length,soon=M.filter(s=>s.st==='soon').length;
+    return`<tr class="click" data-goprinter="${escape(P.id)}"><td><b>${escape(P.name)}</b></td><td class="num">${fmtH(U.hours)}</td><td class="num">${fmt(U.perDay,1)} ч</td><td class="num">${U.prints}</td><td class="num">${U.prints?Math.round(U.ok/U.prints*100)+'%':'—'}</td><td class="num">${U.grams>=1000?fmt(U.grams/1000,2)+' кг':fmt(U.grams,0)+' г'}</td><td class="num">${money(U.failCost)}</td><td class="num">${life?fmt(U.hours/life*100,1)+'%':'—'}</td><td>${over?`<span class="pill fail">пора: ${over}</span>`:soon?`<span class="pill wip">скоро: ${soon}</span>`:'<span class="pill done">в норме</span>'}</td></tr>`}).join('');
+  $('statPrinters').innerHTML=rows;
+  updNavPrinter()}
+function updNavPrinter(){$('navPrinter').textContent=db.printers.reduce((n,P)=>n+maintAll(P).filter(s=>s.st==='over').length,0)||''}
+$('statPrinters').addEventListener('click',e=>{const r=e.target.closest('[data-goprinter]');if(r)go('printer/'+r.dataset.goprinter)});
+
+function bambuDevOptions(sel){const ds=cloud.devices;return'<option value="">— не связан —</option>'+ds.map(d=>`<option value="${escape(d.id)}"${d.id===sel?' selected':''}>${escape(d.name||d.id)}${d.model?' · '+escape(d.model):''}</option>`).join('')+(sel&&!ds.some(d=>d.id===sel)?`<option value="${escape(sel)}" selected>${escape(sel)}</option>`:'')+(ds.length?'':'<option value="" disabled>подключите Bambu Cloud, чтобы выбрать</option>')}
 
 /* ================= Запуск ================= */
 (async()=>{

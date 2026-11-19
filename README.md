@@ -56,6 +56,11 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - **Import from Bambu Lab Cloud** (P2S, P1S, X1, A1): your printer's print history is pulled into the log with real print time, result and per-AMS-slot filament usage. Items and spools are matched automatically by model name, filament type and color. Works through a free Cloudflare Worker, see [docs/bambu-cloud-setup.md](docs/bambu-cloud-setup.md).
 - **Spool sync with Bambu Cloud** (Spools → ⇣ Sync with Bambu Cloud): remaining weight of Bambu Lab RFID spools as reported by the AMS is recorded as a "set remaining" entry, and missing spools are created automatically.
 
+### Printer
+- Runtime from the print log and prototypes (plus hours before tracking), daily load, success rate, depreciation resource, monthly stats.
+- **P2S maintenance schedule** based on Bambu Lab recommendations: X/Y/Z lubrication with usage-based intervals, idler pulleys, air filter, filament cutter, camera and on-condition tasks. Mark tasks done, set custom intervals, see warnings on the dashboard and in the menu.
+- From Bambu Cloud: online status, current print, firmware and available updates, tasks not yet imported.
+
 ### Statistics
 - Totals and averages, cost structure, by material, by month.
 - Prototype costs, filament in stock and printer wear by depreciation hours, per printer.

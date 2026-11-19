@@ -11,6 +11,8 @@
  *   GET  /v1/user-service/my/tasks             — история печати
  *   GET  /v1/iot-service/api/user/bind         — список принтеров
  *   GET  /v1/design-user-service/my/filament/v2 — катушки Bambu Lab из AMS (RFID)
+ *   GET  /v1/iot-service/api/user/device/version — прошивка принтера и обновления
+ *   GET  /v1/iot-service/api/user/print          — текущая печать
  *
  * Регион: заголовок X-Bambu-Region: cn — запрос уйдёт на api.bambulab.cn, иначе api.bambulab.com.
  *
@@ -27,6 +29,8 @@ const ROUTES = {
   '/v1/user-service/my/tasks': 'GET',
   '/v1/iot-service/api/user/bind': 'GET',
   '/v1/design-user-service/my/filament/v2': 'GET',
+  '/v1/iot-service/api/user/device/version': 'GET',
+  '/v1/iot-service/api/user/print': 'GET',
 };
 const HOSTS = { global: 'https://api.bambulab.com', cn: 'https://api.bambulab.cn' };
 const DEFAULT_ORIGINS = 'https://fomins.github.io';

@@ -417,3 +417,20 @@ details.save-more{margin:0}details.save-more>summary{font-size:15px;color:var(--
 #bbState .ok{color:var(--ok-text)}
 @media(max-width:600px){.bb-row{grid-template-columns:24px 1fr}.bb-row .thumb{display:none}.bb-fil{grid-template-columns:auto 1fr 76px auto}.bb-fil select{grid-column:1/-1}}
 .pick-row.on{background:var(--sel)}
+
+/* Принтер и обслуживание */
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint2);margin-right:5px;vertical-align:1px}.dot.on{background:var(--pos)}
+.tabn.bad{background:var(--bad-bg);color:var(--bad-fg)}.tabn.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.mt-row{padding:12px 0;border-bottom:1px solid var(--line)}.mt-row:last-child{border-bottom:0}
+.mt-row.mini{display:flex;gap:10px;align-items:flex-start;padding:8px 0}
+.mhead{display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:start}.mhead .pill{justify-self:start;margin-top:2px}
+.mmain .tl-meta{margin-top:6px}
+.mbar{margin-top:8px;height:6px}.mbar.ok>div{background:var(--pos)}.mbar.soon>div{background:var(--warn-fg)}.mbar.over>div{background:var(--neg)}
+.mset{margin:8px 0 0 122px}
+.dpr{padding:4px 0 10px;border-bottom:1px solid var(--line)}.dpr:last-child{border-bottom:0;padding-bottom:0}
+.dpr-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:4px}.dpr-h{text-align:right}.dpr-h strong{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.dpr-foot{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;font-size:13px}
+.prthumb{max-width:160px;border-radius:10px;margin-top:10px;display:block}
+@media(max-width:700px){.mhead{grid-template-columns:1fr auto}.mhead .pill{grid-column:1/-1}.mset{margin-left:0}}
+.dpr-h strong{white-space:nowrap}
+@media(max-width:600px){.dpr-head{flex-direction:column}.dpr-h{text-align:left}}
