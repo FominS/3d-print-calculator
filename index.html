@@ -59,7 +59,7 @@
 <section class="panel danger-zone"><h2>Удаление</h2><p class="muted">Изделие и его фото будут удалены. Записи журнала печати и списания с катушек останутся.</p><button type="button" class="danger" data-act="delItem">Удалить изделие</button></section></div>
 </section>
 
-<section class="page" id="page-spools" hidden><div class="pagehead"><div><h1>Филаменты</h1><p>Катушки на складе. Остатки списываются по журналу печати и прототипам</p></div><button type="button" id="spoolAdd">+ Катушка</button></div>
+<section class="page" id="page-spools" hidden><div class="pagehead"><div><h1>Филаменты</h1><p>Катушки на складе. Остатки списываются по журналу печати и прототипам</p></div><div class="buttons" style="margin:0"><button type="button" class="secondary" id="bfOpen" title="Сверить остатки катушек Bambu Lab с данными AMS из Bambu Lab Cloud">⇣ Сверить с Bambu Cloud</button><button type="button" id="spoolAdd">+ Катушка</button></div></div>
 <div class="tiles" id="spoolTiles" style="margin-bottom:16px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))"></div>
 <div class="toolbar ptb"><input id="spoolSearch" type="search" placeholder="Поиск: цвет, серия, магазин"><select id="spoolMat" aria-label="Материал"></select><select id="spoolBrand" aria-label="Производитель"></select><select id="spoolFilter" aria-label="Наличие"><option value="active">В наличии</option><option value="low">Заканчиваются</option><option value="empty">Закончились</option><option value="all">Все</option></select><select id="spoolGroup" aria-label="Группировка"><option value="none">Без группировки</option><option value="material">По типу пластика</option></select><select id="spoolSort" aria-label="Сортировка"><option value="remAsc">Остаток: меньше → больше</option><option value="remDesc">Остаток: больше → меньше</option><option value="dateDesc">Дата покупки: новые</option><option value="dateAsc">Дата покупки: старые</option><option value="name">По названию</option></select><div class="seg" id="spoolView" role="tablist" aria-label="Вид"><button type="button" data-v="cards" title="Карточки">▦</button><button type="button" data-v="table" title="Таблица">☰</button></div></div>
 <div id="spoolCards"></div>
@@ -111,6 +111,11 @@
 <div class="toolbar bb-tb"><select id="bbDevice" aria-label="Принтер Bambu Lab"><option value="">Все принтеры аккаунта</option></select><label class="inlinesel">Записать на<select id="bbPrinter"></select></label><label class="check" style="margin:0"><input type="checkbox" id="bbShowDone"> показывать импортированные</label><button type="button" class="secondary small" id="bbReload">↻ Обновить</button></div>
 <p class="muted" id="bbInfo" style="margin:8px 0"></p><div id="bbList" class="bblist"></div>
 <div class="buttons bb-foot"><button type="button" id="bbImport">Импортировать</button><span class="muted" id="bbSelInfo"></span></div></dialog>
+<dialog id="bfDlg" class="dlg wide" aria-labelledby="bfTitle"><div class="dlg-head"><h2 id="bfTitle">Катушки из Bambu Cloud</h2><button type="button" class="iconbtn" id="bfClose" title="Закрыть" aria-label="Закрыть">×</button></div>
+<p class="muted" style="margin:0 0 8px">Фирменные катушки Bambu Lab, которые AMS считал по RFID. Остаток — оценка AMS. Он запишется в катушку как «Установлен остаток»; печати после этого спишутся уже от него.</p>
+<div class="toolbar bb-tb"><label class="check" style="margin:0"><input type="checkbox" id="bfShowSame"> показывать без изменений</label><button type="button" class="secondary small" id="bfReload">↻ Обновить</button></div>
+<p class="muted" id="bfInfo" style="margin:8px 0"></p><div id="bfList" class="bblist"></div>
+<div class="buttons bb-foot"><button type="button" id="bfApply">Применить</button><span class="muted" id="bfSelInfo"></span></div></dialog>
 <div class="vtip" id="vtip" role="tooltip" hidden></div>
 <script src="js/config.js"></script>
 <script src="js/gdrive.js"></script>

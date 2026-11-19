@@ -53,6 +53,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
 - View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.
 - **Import from Bambu Lab Cloud** (P2S, P1S, X1, A1): your printer's print history is pulled into the log with real print time, result and per-AMS-slot filament usage. Items and spools are matched automatically by model name, filament type and color. Works through a free Cloudflare Worker, see [docs/bambu-cloud-setup.md](docs/bambu-cloud-setup.md).
+- **Spool sync with Bambu Cloud** (Spools → ⇣ Sync with Bambu Cloud): remaining weight of Bambu Lab RFID spools as reported by the AMS is recorded as a "set remaining" entry, and missing spools are created automatically.
 
 ### Statistics
 - Totals and averages, cost structure, by material, by month.
@@ -137,7 +138,7 @@ Print history lives in Bambu Lab's cloud. Browsers cannot call it directly (no C
 1. Cloudflare → Workers & Pages → Create Worker, paste `worker/bambu-proxy.js`, Deploy.
 2. Put the Worker URL into `js/config.js` (`bambuProxy`) or into Settings → Bambu Lab Cloud.
 3. Sign in with your Bambu Lab email and password plus the emailed code.
-4. Print log → ⇣ From Bambu Cloud.
+4. Print log → ⇣ From Bambu Cloud for print history; Spools → ⇣ Sync with Bambu Cloud for Bambu Lab RFID spool levels.
 
 The password is never stored. The token (~3 months) stays in the browser only and is not written to the data file. The Bambu Lab API is unofficial.
 

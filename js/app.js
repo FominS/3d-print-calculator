@@ -410,7 +410,7 @@ function guessDensity(name){const n=String(name).toUpperCase();for(const k of Ob
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 function normSpool(s){return{id:String(s.id||uid()),materialId:String(s.materialId||''),brand:String(s.brand||''),series:String(s.series||''),color:String(s.color||''),colorHex:/^#[0-9a-f]{6}$/i.test(s.colorHex)?s.colorHex:'#d9dee8',colorStops:(Array.isArray(s.colorStops)?s.colorStops:[]).filter(v=>/^#[0-9a-f]{6}$/i.test(v)).slice(0,8),
   diameter:number(s.diameter)||1.75,net:number(s.net)||1000,empty:s.empty===''||s.empty==null?'':number(s.empty),price:number(s.price),purchased:String(s.purchased||''),store:String(s.store||''),
-  status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),createdAt:s.createdAt||now(),
+  status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),bambu:String(s.bambu||''),createdAt:s.createdAt||now(),
   ops:(Array.isArray(s.ops)?s.ops:[]).filter(o=>OPNAMES[o?.type]).map(o=>({id:String(o.id||shortId()),at:o.at||now(),date:String(o.date||String(o.at||now()).slice(0,10)),type:o.type,grams:number(o.grams),note:String(o.note||'')}))}}
 function normPrint(p){return{id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),itemId:String(p.itemId||''),itemName:String(p.itemName||''),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),sets:Math.max(1,Math.round(number(p.sets))||1),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),src:String(p.src||''),
   usage:(Array.isArray(p.usage)?p.usage:[]).map(u=>({label:String(u.label||''),materialId:String(u.materialId||''),spoolId:String(u.spoolId||''),grams:number(u.grams)}))}}
@@ -479,7 +479,7 @@ function renderSpoolRem(){const s=spool();if(!s)return;const st=spoolState(s),g=
   $('spHist').innerHTML=st.events.slice().reverse().map(e=>`<tr><td>${escape(e.date||'')}</td><td>${e.item?`<a href="#item/${escape(e.item)}" class="lnk">${escape(e.label)}</a>`:escape(e.label)}</td><td class="num" style="color:${e.delta<0?'var(--neg)':'var(--pos)'}">${e.delta>0?'+':''}${fmt(e.delta,1)} г<div><small>${e.delta>0?'+':''}${fmt(toM(s,e.delta),1)} м</small></div></td><td class="num">${fmt(e.after,0)} г</td><td>${e.op?`<button class="iconbtn danger" data-delop="${escape(e.op)}" title="Отменить корректировку">×</button>`:''}</td></tr>`).join('')+`<tr><td>${escape(s.purchased||s.createdAt.slice(0,10))}</td><td>Новая катушка</td><td class="num">+${fmt(s.net,0)} г</td><td class="num">${fmt(s.net,0)} г</td><td></td></tr>`}
 function updateCorrHint(){const s=spool();if(!s)return;const v=number($('corrVal').value),u=$('corrUnit').value;$('corrHint').textContent=v?(u==='m'?`${fmt(v,1)} м ≈ ${fmt(v*gPerM(s),1)} г`:`${fmt(v,1)} г ≈ ${fmt(toM(s,v),1)} м`):''}
 function addOp(s,type,grams,note){s.ops.push({id:shortId(),at:now(),date:today(),type,grams:Math.max(0,grams),note});if(s.status==='sealed'&&type!=='add')s.status='open';const r=spoolState(s).remaining;if(r<=0&&s.status!=='empty'&&confirm('Остаток 0 — отметить катушку как закончившуюся?'))s.status='empty';persist();renderSpool();renderSpools()}
-function newSpool(from,tpl){const s=normSpool(from?{...structuredClone(from),id:'',ops:[],createdAt:'',status:'sealed',opened:'',dried:''}:{materialId:tpl?.materialId||db.materials[0]?.id,diameter:tpl?.diameter,net:tpl?.net,purchased:today()});db.spools.unshift(s);persist();renderSpools();go('spool/'+s.id)}
+function newSpool(from,tpl){const s=normSpool(from?{...structuredClone(from),id:'',bambu:'',ops:[],createdAt:'',status:'sealed',opened:'',dried:''}:{materialId:tpl?.materialId||db.materials[0]?.id,diameter:tpl?.diameter,net:tpl?.net,purchased:today()});db.spools.unshift(s);persist();renderSpools();go('spool/'+s.id)}
 
 
 function afterColor(full){renderColorChips();if(full)renderColorEdit();renderSpoolHead();renderSpoolRem();schedulePersist();renderSpools()}
@@ -920,6 +920,70 @@ $('bbImport').onclick=()=>{const pid=$('bbPrinter').value,sel=bbTasks.filter(t=>
       usage:st.usage.filter(u=>u.grams>0).map(u=>{const[k,id]=u.pick.split(':');const s=k==='s'?getSpool(id):null;return{label:[u.f.type,u.f.slot].filter(Boolean).join(' · '),materialId:s?s.materialId:id||'',spoolId:s?s.id:'',grams:u.grams}})}))}
   persist();renderList();if(currentPage==='item')renderItemPrints();$('bbDlg').close();setStatus(`Импортировано записей: ${sel.length}`)};
 bbStateUi();
+
+/* --- Катушки из Bambu Cloud: сверка остатков и создание фирменных катушек --- */
+let bfList=[],bfPick=new Map();
+const bfBrand=()=>db.lib.brands.find(b=>/bambu/i.test(b.name))?.name||'Bambu Lab';
+const r1=n=>Math.round(n*10)/10;
+function bfColorName(hex){let best='',bd=1e9;for(const c of db.lib.colors){if(c.stops.length!==1)continue;const d=colDist(hex,c.stops[0]);if(d<bd){bd=d;best=c.name}}return bd<=45?best:''}
+// Материал катушки — строго по типу пластика: PLA-CF ≠ PLA.
+const bfKey=t=>String(t||'').toUpperCase().replace(/[\s_\-]+/g,'');
+const bfMat=type=>{const k=bfKey(type);return k?db.materials.find(m=>bfKey(m.name)===k)?.id||'':''};
+function bfMatch(f,used){const linked=db.spools.find(s=>s.bambu===f.key);if(linked&&!used.has(linked.id))return linked.id;
+  const mid=bfMat(f.type),taken=new Set(bfList.map(x=>x.key));if(!mid)return'';let best='',bd=1e9;
+  for(const s of db.spools){if(used.has(s.id)||(s.bambu&&s.bambu!==f.key&&taken.has(s.bambu)))continue;if(s.materialId!==mid)continue;
+    const cd=Math.min(colDist(f.color,s.colorHex),...s.colorStops.map(c=>colDist(f.color,c)));if(cd>70)continue;
+    const d=cd+(/bambu/i.test(s.brand)?0:25)+(f.name&&ieq(s.series,f.name)?0:20)+(s.status==='empty'?40:0)+(s.bambu?60:0)+(number(s.net)&&f.total&&Math.abs(number(s.net)-f.total)>1?15:0);
+    if(d<bd){bd=d;best=s.id}}return best}
+function bfChange(f,target){if(target==='new')return{isNew:true};const s=getSpool(target);if(!s)return null;
+  const cur=spoolState(s).remaining,set=Math.abs(f.remaining-cur)>=1;
+  const status=f.depleted&&s.status!=='empty'?'empty':!f.depleted&&s.status==='sealed'&&(f.inPrinter||f.remaining<f.total-1)?'open':'';
+  return{s,cur,set,status,link:s.bambu!==f.key,none:!set&&!status&&s.bambu===f.key}}
+function bfDefault(f,used){const sid=bfMatch(f,used);if(sid)used.add(sid);const target=sid||(f.depleted?'skip':'new'),ch=bfChange(f,target);return{target,on:target!=='skip'&&!(ch&&ch.none)}}
+function bfTargetOptions(f,sel){const mid=bfMat(f.type),list=db.spools.slice().sort((a,b)=>(b.materialId===mid)-(a.materialId===mid)||(a.status==='empty')-(b.status==='empty')||spName(a).localeCompare(spName(b)));
+  return`<option value="new"${sel==='new'?' selected':''}>＋ Создать новую катушку</option><option value="skip"${sel==='skip'?' selected':''}>Пропустить</option><optgroup label="Связать с катушкой">${list.map(s=>`<option value="${escape(s.id)}"${sel===s.id?' selected':''}>${escape(getMat(s.materialId).name)} · ${escape(spName(s))} · ${fmt(spoolState(s).remaining,0)} г${s.status==='empty'?' · закончилась':''}</option>`).join('')}</optgroup>`}
+function bfDesc(f,st){if(st.target==='skip')return'<small class="muted">Не изменится</small>';const ch=bfChange(f,st.target);if(!ch)return'';
+  if(ch.isNew){const mid=bfMat(f.type);return`<small>Новая: ${escape(bfBrand())} ${escape(f.name||f.type)}${bfColorName(f.color)?' · '+escape(bfColorName(f.color)):''} · ${fmt(f.remaining,0)} из ${fmt(f.total||1000,0)} г${mid?'':` · <b>материал «${escape(f.type||'?')}» будет создан без цены</b>`}</small>`}
+  const parts=[];if(ch.set){const d=f.remaining-ch.cur;parts.push(`остаток ${fmt(ch.cur,0)} → <b>${fmt(f.remaining,0)} г</b> (${d>0?'+':'−'}${fmt(Math.abs(d),0)} г)`)}
+  if(ch.status)parts.push(`статус → ${SPOOL_ST[ch.status]}`);if(ch.link&&!parts.length)parts.push('только связать');
+  return`<small>${parts.length?parts.join(' · '):'Без изменений'}</small>`}
+function bfRender(){const show=$('bfShowSame').checked;
+  const rows=bfList.filter(f=>{const st=bfPick.get(f.key),ch=bfChange(f,st.target);return show||!(ch&&ch.none)});
+  const same=bfList.length-bfList.filter(f=>{const ch=bfChange(f,bfPick.get(f.key).target);return!(ch&&ch.none)}).length;
+  $('bfInfo').textContent=bfList.length?`Катушек в облаке: ${bfList.length}${same?` · совпадают с вашими: ${same}`:''}.`:'';
+  $('bfList').innerHTML=rows.length?rows.map(f=>{const st=bfPick.get(f.key),pct=f.total?Math.round(f.remaining/f.total*100):0;
+    return`<div class="bb-row${st.on?' on':''}" data-fk="${escape(f.key)}"><label class="bb-chk"><input type="checkbox" data-ff="on"${st.on?' checked':''} aria-label="Применить"></label>
+      <div class="thumb"><span class="swatch big" style="background:${f.color||'var(--faint)'}"></span></div>
+      <div class="bb-main"><div class="bb-ttl"><b>${escape(f.name||f.type||'Катушка')}</b><small>${escape(f.type)}</small>${f.slot&&f.inPrinter?`<span class="pill sp-open">${escape(f.slot)}</span>`:'<span class="pill sp-empty">не в AMS</span>'}${f.depleted?'<span class="pill fail">закончилась</span>':''}</div>
+        <div class="tl-meta"><span>В облаке: <b>${fmt(f.remaining,0)} г</b>${f.total?` из ${fmt(f.total,0)} г · ${pct}%`:''}</span></div>
+        <label class="bb-it">Катушка<select data-ff="target">${bfTargetOptions(f,st.target)}</select></label>
+        <div style="margin-top:6px">${bfDesc(f,st)}</div></div></div>`}).join(''):`<div class="empty" style="display:block">${bfList.length?'Все катушки совпадают с облаком.':'В облаке нет катушек. Видны только катушки Bambu Lab с RFID, которые AMS хоть раз считал.'}</div>`;
+  bfSel()}
+function bfSel(){const n=bfList.filter(f=>{const st=bfPick.get(f.key);return st.on&&st.target!=='skip'}).length;$('bfSelInfo').textContent=n?`Выбрано: ${n}`:'Ничего не выбрано';$('bfApply').disabled=!n}
+async function bfLoad(){$('bfList').innerHTML='<div class="empty" style="display:block">Загрузка катушек из Bambu Cloud…</div>';$('bfInfo').textContent='';$('bfApply').disabled=true;
+  try{bfList=(await BB.filaments()).sort((a,b)=>(b.inPrinter-a.inPrinter)||String(a.slot).localeCompare(String(b.slot))||a.type.localeCompare(b.type));const used=new Set();bfPick=new Map();for(const f of bfList)if(db.spools.some(s=>s.bambu===f.key))bfPick.set(f.key,bfDefault(f,used));for(const f of bfList)if(!bfPick.has(f.key))bfPick.set(f.key,bfDefault(f,used));bfRender()}
+  catch(e){$('bfList').innerHTML=`<div class="empty" style="display:block">${escape(e.message)}</div>`;if(e.code==='auth')bbStateUi()}}
+function bfOpen(){if(!BB.connected()){go('settings');setTimeout(()=>{$('bambuPanel').scrollIntoView({block:'start',behavior:'smooth'})},80);setStatus('Сначала подключите Bambu Lab Cloud');return}$('bfDlg').showModal();bfLoad()}
+$('bfOpen').onclick=bfOpen;$('bfClose').onclick=()=>$('bfDlg').close();$('bfDlg').addEventListener('click',e=>{if(e.target===$('bfDlg'))$('bfDlg').close()});
+$('bfReload').onclick=bfLoad;$('bfShowSame').onchange=bfRender;
+$('bfList').addEventListener('change',e=>{const row=e.target.closest('[data-fk]');if(!row)return;const st=bfPick.get(row.dataset.fk);if(!st)return;
+  if(e.target.dataset.ff==='on'){st.on=e.target.checked;row.classList.toggle('on',st.on);bfSel()}else if(e.target.dataset.ff==='target'){st.target=e.target.value;st.on=st.target!=='skip';bfRender()}});
+$('bfApply').onclick=()=>{const sel=bfList.filter(f=>{const st=bfPick.get(f.key);return st.on&&st.target!=='skip'});if(!sel.length)return;
+  const used=new Map();for(const f of sel){const t=bfPick.get(f.key).target;if(t!=='new'){if(used.has(t)){alert(`Катушка «${spName(getSpool(t))}» выбрана для двух облачных катушек. Выберите разные или создайте новую.`);return}used.set(t,f)}}
+  let upd=0,created=0;const newMats=[];
+  for(const f of sel){const t=bfPick.get(f.key).target,note='Bambu Cloud'+(f.slot&&f.inPrinter?' · '+f.slot:'');
+    for(const s of db.spools)if(s.bambu===f.key&&s.id!==t)s.bambu='';
+    if(t==='new'){let mid=bfMat(f.type);if(!mid){const m={id:shortId(),name:f.type||'Bambu Lab',price:0,density:guessDensity(f.type)};db.materials.push(m);mid=m.id;newMats.push(m.name)}
+      const st=f.depleted?'empty':f.inPrinter||(f.total&&f.remaining<f.total-1)?'open':'sealed',net=f.total||1000;
+      const s=normSpool({materialId:mid,brand:bfBrand(),series:f.name,color:bfColorName(f.color),colorHex:f.color||'#d9dee8',net,status:st,opened:st==='sealed'?'':today(),bambu:f.key,notes:'Создана из Bambu Cloud'});
+      if(Math.abs(f.remaining-net)>=1)s.ops.push({id:shortId(),at:now(),date:today(),type:'set',grams:r1(f.remaining),note});
+      libAbsorb(s);db.spools.unshift(s);created++;continue}
+    const ch=bfChange(f,t);if(!ch||ch.isNew)continue;const s=ch.s;s.bambu=f.key;
+    if(ch.set)s.ops.push({id:shortId(),at:now(),date:today(),type:'set',grams:r1(f.remaining),note});
+    if(ch.status){s.status=ch.status;if(ch.status==='open'&&!s.opened)s.opened=today()}upd++}
+  persist();renderAll();$('bfDlg').close();
+  setStatus([upd&&`Обновлено катушек: ${upd}`,created&&`создано: ${created}`].filter(Boolean).join(' · ')||'Готово');
+  if(newMats.length)alert(`Добавлены материалы без цены: ${newMats.join(', ')}.\nУкажите цену в «Настройки → Материалы» или цену катушки в её карточке.`)};
 
 /* ================= Запуск ================= */
 (async()=>{

@@ -127,8 +127,33 @@ window.Bambu = (() => {
     };
   }
 
+  /* Катушки Bambu Lab, которые AMS считал по RFID. Остаток — оценка AMS.
+   * Уникального номера катушки API не отдаёт: ключ строится из серии, цвета и веса,
+   * одинаковые катушки различаются порядковым номером. */
+  async function filaments() {
+    const d = await call('/v1/design-user-service/my/filament/v2');
+    const list = Array.isArray(d.hits) ? d.hits : Array.isArray(d.filaments) ? d.filaments : Array.isArray(d) ? d : [];
+    const seen = new Map();
+    return list.map(f => {
+      const hex = String(f.color || f.colorCode || '').replace(/^#/, '');
+      const color = /^[0-9a-f]{6}/i.test(hex) ? '#' + hex.slice(0, 6).toLowerCase() : '';
+      const name = String(f.filamentName || f.name || '').trim(), type = String(f.filamentType || f.type || '').trim();
+      const total = Number(f.totalNetWeight) || 0, remaining = Math.max(0, Number(f.netWeight) || 0);
+      const slotRaw = f.slotId, inSlot = slotRaw !== '' && slotRaw != null && f.amsId != null;
+      const base = [type, name, color, total].join('|').toLowerCase();
+      const n = (seen.get(base) || 0) + 1; seen.set(base, n);
+      const rawId = f.id ?? f.spoolId ?? f.trayUuid ?? f.tray_uuid ?? '';
+      return {
+        key: rawId !== '' ? 'id:' + rawId : base + '#' + n,
+        name, type, color, total, remaining,
+        inPrinter: !!f.inPrinter, depleted: !!f.depleted || (total > 0 && remaining <= 0),
+        slot: inSlot ? `AMS ${Number(f.amsId) + 1}-${Number(slotRaw) + 1}` : '',
+      };
+    });
+  }
+
   return {
     state, patch, proxy, region, connected, expired,
-    login, sendCode, loginCode, setToken, logout, devices, tasks,
+    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments,
   };
 })();
