@@ -125,9 +125,21 @@ window.Bambu = (() => {
       seconds: real || Number(t.costTime) || 0,
       estimated: !real,
       est: Number(t.costTime) || 0,
+      designId: Number(t.designId) || 0, modelId: String(t.modelId || ''), plateIdx: Number(t.plateIndex) || 0,
       grams: Number(t.weight) || fil.reduce((a, f) => a + f.grams, 0),
       filaments: fil,
     };
+  }
+
+  /* Картинка Bambu Cloud (обложка задания) через Worker — чтобы сохранить её как фото изделия. */
+  async function image(url) {
+    const base = proxy();
+    if (!base) throw err('Не задан адрес прокси');
+    const res = await fetch(base + '/img?' + new URLSearchParams({ u: url }));
+    if (!res.ok) throw err('Не удалось загрузить картинку: HTTP ' + res.status);
+    const blob = await res.blob();
+    if (!/^image\//.test(blob.type)) throw err('Не картинка');
+    return blob;
   }
 
   /* Прошивка: текущая версия и доступные обновления. */
@@ -185,6 +197,6 @@ window.Bambu = (() => {
 
   return {
     state, patch, proxy, region, connected, expired,
-    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments, deviceVersion, currentPrint,
+    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments, deviceVersion, currentPrint, image,
   };
 })();

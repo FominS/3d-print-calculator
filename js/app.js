@@ -42,7 +42,7 @@ function normItem(x){
     print:{nozzle:'0.4',layer:'0.2',infill:'',walls:'',supports:'',plate:'',other:'',...(x.print||{})},
     desc:{lang:'ru',intro:'',hardware:'',assembly:'',tips:'',...(x.desc||{})},
     photos:Array.isArray(x.photos)?x.photos.filter(p=>p&&p.file).map(p=>({id:String(p.id||shortId()),file:String(p.file)})):[],
-    cover:String(x.cover||'')};
+    cover:String(x.cover||''),coverUrl:/^https:\/\//.test(x.coverUrl||'')?String(x.coverUrl):'',bambuKey:String(x.bambuKey||'')};
   if(Array.isArray(x.parts)&&x.parts.length){
     it.parts=x.parts.map(p=>({id:String(p.id||shortId()),name:String(p.name||''),qty:Math.max(1,Math.round(number(p.qty))||1),hours:number(p.hours),
       filaments:(Array.isArray(p.filaments)?p.filaments:[]).map(f=>({materialId:String(f.materialId||''),grams:number(f.grams)}))}));
@@ -293,18 +293,19 @@ function saveCalc(open){const name=$('name').value.trim();if(!name){alert('Вв�
 
 /* ================= Каталог ================= */
 const printsOf=id=>db.prints.filter(p=>p.itemId===id);
+const coverImg=x=>x.cover?`<img data-photo="${escape(x.cover)}" alt="">`:x.coverUrl?`<img src="${escape(x.coverUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'◈';
 function filtered(){const q=$('search').value.trim().toLowerCase(),st=$('statusFilter').value,mf=$('matFilter').value,so=$('catSort').value;
   const list=db.items.filter(x=>(!st||x.status===st)&&(!mf||itemMaterials(x).includes(mf))&&(x.name+' '+x.tags.join(' ')+' '+itemMaterials(x).map(m=>getMat(m).name).join(' ')+' '+x.notes).toLowerCase().includes(q));
-  const cost=new Map(list.map(x=>[x.id,calcItem(x).total])),cnt=x=>printsOf(x.id).reduce((a,p)=>a+(p.result==='ok'?p.sets:0),0);
+  const cost=new Map(list.map(x=>[x.id,calcItem(x).total])),cnt=x=>itemDone(x).sets;
   const cmp={new:(a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''),old:(a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''),name:(a,b)=>a.name.localeCompare(b.name,'ru'),costDesc:(a,b)=>cost.get(b.id)-cost.get(a.id),costAsc:(a,b)=>cost.get(a.id)-cost.get(b.id),printed:(a,b)=>cnt(b)-cnt(a)}[so];
   return cmp?list.sort(cmp):list}
 let catView=lsGet('p2s_cat_view','cards');
 const matDots=mids=>`<span class="matdots">${mids.map(m=>`<span class="pill">${escape(getMat(m).name)}</span>`).join('')}</span>`;
-function renderCards(list){$('catCards').innerHTML=list.map(x=>{const c=calcItem(x),n=printsOf(x.id).filter(p=>p.result==='ok').reduce((a,p)=>a+p.sets,0);return`<article class="icard" tabindex="0" data-open="${escape(x.id)}"><div class="cover">${x.cover?`<img data-photo="${escape(x.cover)}" alt="">`:'◈'}</div><div class="body"><div class="ttl">${escape(x.name)}</div><div class="meta"><span class="pill ${x.status}">${STATUSES[x.status]}</span>${matDots(itemMaterials(x))}</div><div class="meta"><span class="cost">${money(c.total)}</span><span>· ${fmt(c.grams)} г · ${fmtH(c.hours)}</span></div>${n?`<div class="meta">напечатано: ${n}</div>`:''}</div><div class="acts"><button type="button" data-cact="print" title="Записать печать">✓ Печать</button><button type="button" class="secondary" data-cact="dup" title="Дублировать">⧉</button></div></article>`}).join('');hydrate($('catCards'))}
+function renderCards(list){$('catCards').innerHTML=list.map(x=>{const c=calcItem(x),n=itemDone(x).sets;return`<article class="icard" tabindex="0" data-open="${escape(x.id)}"><div class="cover">${coverImg(x)}</div><div class="body"><div class="ttl">${escape(x.name)}</div><div class="meta"><span class="pill ${x.status}">${STATUSES[x.status]}</span>${matDots(itemMaterials(x))}</div><div class="meta"><span class="cost">${money(c.total)}</span><span>· ${fmt(c.grams)} г · ${fmtH(c.hours)}</span></div>${n?`<div class="meta">напечатано: ${n}</div>`:''}</div><div class="acts"><button type="button" data-cact="print" title="Записать печать">✓ Печать</button><button type="button" class="secondary" data-cact="dup" title="Дублировать">⧉</button></div></article>`}).join('');hydrate($('catCards'))}
 
 function renderRows(list){
   $('empty').hidden=list.length>0;$('empty').textContent=db.items.length?'Ничего не найдено.':'Пока нет сохранённых изделий.';
-  $('rows').innerHTML=list.map(x=>{const c=calcItem(x),n=x.parts.length;return`<tr class="click" data-open="${escape(x.id)}"><td><div class="thumb">${x.cover?`<img data-photo="${escape(x.cover)}" alt="">`:'◈'}</div></td><td><b>${escape(x.name)}</b><div><small>${n>1?n+' элемент'+(n<5?'а':'ов'):''}${n>1&&x.tags.length?' · ':''}${escape(x.tags.join(', '))}</small></div></td><td><span class="pill ${x.status}">${STATUSES[x.status]}</span></td><td>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}</td><td class="num">${fmt(c.grams)} г</td><td class="num">${fmtH(c.hours)}</td><td class="num"><b>${money(c.total)}</b>${c.proto.count?`<div><small>+ ${money(c.proto.total)} прототипы</small></div>`:''}</td><td>${escape((x.createdAt||'').slice(0,10))}</td></tr>`}).join('');
+  $('rows').innerHTML=list.map(x=>{const c=calcItem(x),n=x.parts.length;return`<tr class="click" data-open="${escape(x.id)}"><td><div class="thumb">${coverImg(x)}</div></td><td><b>${escape(x.name)}</b><div><small>${n>1?n+' элемент'+(n<5?'а':'ов'):''}${n>1&&x.tags.length?' · ':''}${escape(x.tags.join(', '))}</small></div></td><td><span class="pill ${x.status}">${STATUSES[x.status]}</span></td><td>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}</td><td class="num">${fmt(c.grams)} г</td><td class="num">${fmtH(c.hours)}</td><td class="num"><b>${money(c.total)}</b>${c.proto.count?`<div><small>+ ${money(c.proto.total)} прототипы</small></div>`:''}</td><td>${escape((x.createdAt||'').slice(0,10))}</td></tr>`}).join('');
   hydrate($('rows'))}
 function renderList(){const fl=filtered();renderRows(fl);renderCards(fl);$('catCards').hidden=catView!=='cards'||!fl.length;$('catTable').hidden=catView!=='table'||!fl.length;$('catSub').textContent=db.items.length?`Всего: ${db.items.length}${fl.length!==db.items.length?` · показано: ${fl.length}`:''}`:'Каталог ваших моделей';if(currentPage==='home')renderDash();renderStats();renderSpools();renderLog();$('navCount').textContent=db.items.length||''}
 
@@ -333,7 +334,7 @@ function renderStats(){renderStatPrinters();
 /* ================= Страница изделия ================= */
 const item=()=>db.items.find(i=>i.id===currentItemId);
 const touch=it=>{it.updatedAt=now()};
-function renderItem(){const it=item();if(!it)return;$('itCover').innerHTML=it.cover?`<img data-photo="${escape(it.cover)}" alt="">`:'◈';hydrate($('itCover'));$('itTabLogN').textContent=printsOf(it.id).length||'';
+function renderItem(){const it=item();if(!it)return;$('itCover').innerHTML=coverImg(it);hydrate($('itCover'));$('itTabLogN').textContent=printsOf(it.id).length||'';
   $('itTitle').textContent=it.name||'Без названия';
   $('itMeta').innerHTML=`<span class="pill ${it.status}">${STATUSES[it.status]}</span> · создано ${escape((it.createdAt||'').slice(0,10))}${it.updatedAt?' · изменено '+escape(new Date(it.updatedAt).toLocaleString('ru-RU')):''}`;
   $('itPrinter').innerHTML=printerOptions(it.printerId);
@@ -418,7 +419,7 @@ function normSpool(s){return{id:String(s.id||uid()),materialId:String(s.material
   diameter:number(s.diameter)||1.75,net:number(s.net)||1000,empty:s.empty===''||s.empty==null?'':number(s.empty),price:number(s.price),purchased:String(s.purchased||''),store:String(s.store||''),
   status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),bambu:String(s.bambu||''),createdAt:s.createdAt||now(),
   ops:(Array.isArray(s.ops)?s.ops:[]).filter(o=>OPNAMES[o?.type]).map(o=>({id:String(o.id||shortId()),at:o.at||now(),date:String(o.date||String(o.at||now()).slice(0,10)),type:o.type,grams:number(o.grams),note:String(o.note||'')}))}}
-function normPrint(p){return{id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),itemId:String(p.itemId||''),itemName:String(p.itemName||''),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),sets:Math.max(1,Math.round(number(p.sets))||1),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),src:String(p.src||''),
+function normPrint(p){return{id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),itemId:String(p.itemId||''),itemName:String(p.itemName||''),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),sets:Math.max(1,Math.round(number(p.sets))||1),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),src:String(p.src||''),partId:String(p.partId||''),plate:String(p.plate||''),cover:/^https:\/\//.test(p.cover||'')?String(p.cover):'',
   usage:(Array.isArray(p.usage)?p.usage:[]).map(u=>({label:String(u.label||''),materialId:String(u.materialId||''),spoolId:String(u.spoolId||''),grams:number(u.grams)}))}}
 const getSpool=id=>db.spools.find(s=>s.id===id);
 const spName=s=>[s.brand,s.series,s.color].map(x=>String(x).trim()).filter(Boolean).join(' ')||'Без названия';
@@ -630,28 +631,29 @@ const MONTHS=['Январь','Февраль','Март','Апрель','Май'
 const printGrams=p=>p.usage.reduce((a,u)=>a+u.grams,0);
 // Себестоимость записи журнала по факту: граммы из списания (цена катушки, иначе цена материала) + время печати × параметры принтера.
 // Для старых записей без времени берётся расчётное время изделия × комплекты.
-function printHours(p){if(p.hours!=null)return number(p.hours);const it=db.items.find(i=>i.id===p.itemId);return it?calcItem(it).hours*p.sets:0}
+function printHours(p){if(p.hours!=null)return number(p.hours);const it=db.items.find(i=>i.id===p.itemId),pt=p.partId&&it?.parts.find(x=>x.id===p.partId);return pt?number(pt.hours)*p.sets:it?calcItem(it).hours*p.sets:0}
 function printCalc(p){const it=db.items.find(i=>i.id===p.itemId),P=getPrinter(p.printerId||it?.printerId),h=printHours(p),tariff=number(db.settings.tariff);
   const r={hours:h,grams:0,plastic:0,byMat:{},printer:P};
   for(const u of p.usage){const s=getSpool(u.spoolId),mid=u.materialId||s?.materialId||'',g=number(u.grams),pr=s&&s.price&&number(s.net)?s.price/number(s.net):number(getMat(mid).price)/1000,c=g*pr;r.grams+=g;r.plastic+=c;const b=r.byMat[mid]??={grams:0,cost:0};b.grams+=g;b.cost+=c}
   r.power=h*number(P.watts)/1000*tariff;r.depreciation=h*amortH(P);r.maintenance=h*number(P.maintenance);r.total=r.plastic+r.power+r.depreciation+r.maintenance;return r}
 function printCost(p){return printCalc(p).total}
 function printCostOld(p){const it=db.items.find(i=>i.id===p.itemId);if(!it)return null;const c=calcItem({...it,printerId:p.printerId||it.printerId});return c.total*p.sets}
-function logSummary(list){let g=0,cost=0,hours=0,failCost=0;for(const p of list){const c=printCalc(p);g+=c.grams;cost+=c.total;hours+=c.hours;if(p.result==='fail')failCost+=c.total}const fails=list.filter(p=>p.result==='fail').length,sets=list.filter(p=>p.result==='ok').reduce((a,p)=>a+p.sets,0);return{n:list.length,g,fails,sets,cost,hours,failCost}}
+function logSummary(list){let g=0,cost=0,hours=0,failCost=0;for(const p of list){const c=printCalc(p);g+=c.grams;cost+=c.total;hours+=c.hours;if(p.result==='fail')failCost+=c.total}const fails=list.filter(p=>p.result==='fail').length,sets=list.filter(p=>p.result==='ok').reduce((a,p)=>a+(p.partId?0:p.sets),0);return{n:list.length,g,fails,sets,cost,hours,failCost}}
 let logView=lsGet('p2s_log_view2','timeline');
 const WD=['вс','пн','вт','ср','чт','пт','сб'];
 const dayTitle=d=>{const x=new Date(d+'T12:00:00');if(isNaN(x))return d;const t=today(),y=new Date(Date.now()-864e5),ys=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');return(d===t?'Сегодня, ':d===ys?'Вчера, ':'')+x.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:x.getFullYear()===new Date().getFullYear()?undefined:'numeric'})+', '+WD[x.getDay()]};
 function tlItem(p,inItem){const c=printCalc(p),it=db.items.find(i=>i.id===p.itemId),ok=p.result!=='fail',sp=usageSpools(p);
-  return`<div class="tl-item"><span class="ricon ${ok?'ok':'fail'}" title="${ok?'Успешно':'Неудачно'}">${ok?'✓':'✕'}</span><div class="tl-main">${inItem?`<b>${dayTitle(p.date)}</b>`:it?`<a href="#item/${escape(it.id)}" class="lnk">${escape(p.itemName||it.name)}</a>`:`<b>${escape(p.itemName||'Удалённое изделие')}</b>`}<div class="tl-meta">${sp.length?`<span>${sp.map(s=>swatch(s,'sm')).join(' ')} ${escape(usageMats(p).map(m=>getMat(m).name).join(' + '))}</span>`:`<span>${escape(usageMats(p).map(m=>getMat(m).name).join(' + ')||'без списания')}</span>`}<span>⏱ ${fmtH(c.hours)}</span><span>${fmt(c.grams,1)} г</span>${p.sets>1?`<span>× ${p.sets} компл.</span>`:''}${db.printers.length>1?`<span>${escape(c.printer.name)}</span>`:''}</div>${p.note?`<div class="tl-note">${escape(p.note)}</div>`:''}</div><div class="tl-side"><b>${money(c.total)}</b><div class="tl-acts"><button class="secondary" data-linkprint="${escape(p.id)}" title="Привязать к изделию из каталога">⛓ Изделие</button><button class="secondary" data-repeat="${escape(p.id)}" title="Повторить печать с теми же параметрами">↻ Повторить</button><button class="iconbtn danger" data-delprint="${escape(p.id)}" title="Удалить запись (вернёт граммы на катушки)">×</button></div></div></div>`}
+  const im=printImgSrc(p),pt=p.partId&&it?.parts.find(x=>x.id===p.partId);
+  return`<div class="tl-item${im?' has-img':''}">${im?`<div class="tl-img">${imgTag(im)}<span class="ricon ${ok?'ok':'fail'}" title="${ok?'Успешно':'Неудачно'}">${ok?'✓':'✕'}</span></div>`:`<span class="ricon ${ok?'ok':'fail'}" title="${ok?'Успешно':'Неудачно'}">${ok?'✓':'✕'}</span>`}<div class="tl-main">${inItem?`<b>${dayTitle(p.date)}</b>`:it?`<a href="#item/${escape(it.id)}" class="lnk">${escape(p.itemName||it.name)}</a>`:`<b>${escape(p.itemName||'Удалённое изделие')}</b>`}<div class="tl-meta">${sp.length?`<span>${sp.map(s=>swatch(s,'sm')).join(' ')} ${escape(usageMats(p).map(m=>getMat(m).name).join(' + '))}</span>`:`<span>${escape(usageMats(p).map(m=>getMat(m).name).join(' + ')||'без списания')}</span>`}<span>⏱ ${fmtH(c.hours)}</span><span>${fmt(c.grams,1)} г</span>${pt?`<span class="pill sp-empty">◧ ${escape(pt.name||'элемент')}${p.sets>1?' × '+p.sets+' шт':''}</span>`:p.sets>1?`<span>× ${p.sets} компл.</span>`:''}${db.printers.length>1?`<span>${escape(c.printer.name)}</span>`:''}</div>${p.note?`<div class="tl-note">${escape(p.note)}</div>`:''}</div><div class="tl-side"><b>${money(c.total)}</b><div class="tl-acts"><button class="secondary" data-linkprint="${escape(p.id)}" title="Привязать к изделию из каталога">⛓ Изделие</button><button class="secondary" data-repeat="${escape(p.id)}" title="Повторить печать с теми же параметрами">↻ Повторить</button><button class="iconbtn danger" data-delprint="${escape(p.id)}" title="Удалить запись (вернёт граммы на катушки)">×</button></div></div></div>`}
 function renderLog(){const q=$('logSearch').value.trim().toLowerCase(),rf=$('logResult').value,multi=db.printers.length>1;
   const all=db.prints.slice().sort((a,b)=>(b.date+b.at).localeCompare(a.date+a.at)),list=all.filter(p=>(!rf||p.result===rf)&&(p.itemName||'').toLowerCase().includes(q));
   const S=logSummary(list);
   $('logSub').textContent=all.length?`Записей: ${S.n}${list.length!==all.length?` из ${all.length}`:''} · успешных комплектов: ${S.sets} · неудачных: ${S.fails} · ${fmtH(S.hours)} · ${fmt(S.g,0)} г · ${money(S.cost)}`:'Каждая печать: что, когда, с каких катушек и сколько стоила';
   $('logEmpty').hidden=list.length>0;$('logEmpty').innerHTML=all.length?'Ничего не найдено — измените фильтры.':'<b>Записей пока нет.</b><br>Нажмите «Записать печать» и выберите изделие — пластик спишется с катушек, а себестоимость попадёт в статистику.';
   const tl=logView==='timeline';$('logTimeline').hidden=!tl||!list.length;$('logTableWrap').hidden=tl||!list.length;
-  if(tl){let last='';$('logTimeline').innerHTML=list.map(p=>{let hdr='';if(p.date!==last){last=p.date;const day=list.filter(x=>x.date===p.date),s=logSummary(day);hdr=`<div class="tl-day"><b>${dayTitle(p.date)}</b><small>${s.n} ${s.n===1?'печать':s.n<5?'печати':'печатей'} · ${money(s.cost)}</small></div>`}return hdr+tlItem(p)}).join('');return}
+  if(tl){let last='';$('logTimeline').innerHTML=list.map(p=>{let hdr='';if(p.date!==last){last=p.date;const day=list.filter(x=>x.date===p.date),s=logSummary(day);hdr=`<div class="tl-day"><b>${dayTitle(p.date)}</b><small>${s.n} ${s.n===1?'печать':s.n<5?'печати':'печатей'} · ${money(s.cost)}</small></div>`}return hdr+tlItem(p)}).join('');hydrate($('logTimeline'));return}
   const cols=multi?12:11;$('logHead').innerHTML=LOG_HEAD(true,multi);
-  if(logView==='list'){$('logRows').innerHTML=list.map(p=>printRow(p,true)).join('');return}
+  if(logView==='list'){$('logRows').innerHTML=list.map(p=>printRow(p,true)).join('');hydrate($('logRows'));return}
   const key=p=>logView==='year'?p.date.slice(0,4):p.date.slice(0,7),groups=new Map();for(const p of list){const k=key(p);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(p)}
   const title=k=>logView==='year'?`${k} год`:`${MONTHS[+k.slice(5,7)-1]||k} ${k.slice(0,4)}`,closed=new Set(($('logRows').dataset.closed||'').split(',').filter(Boolean));
   $('logRows').innerHTML=[...groups.entries()].map(([k,ps])=>{const s=logSummary(ps),open=!closed.has(k);return`<tr class="grp" data-grp="${k}"><td colspan="${cols}"><span class="caret">${open?'▾':'▸'}</span><b>${title(k)}</b><span class="muted"> · записей ${s.n} · комплектов ${s.sets}${s.fails?` · неудачных ${s.fails}`:''} · ${fmtH(s.hours)} · ${fmt(s.g,0)} г · ${money(s.cost)}</span></td></tr>`+(open?ps.map(p=>printRow(p,true)).join(''):'')}).join('')}
@@ -662,19 +664,19 @@ $('logTimeline').addEventListener('click',e=>{const id=e.target.closest('[data-d
 const usageSpools=p=>[...new Set(p.usage.map(u=>u.spoolId).filter(Boolean))].map(getSpool).filter(Boolean);
 const usageMats=p=>[...new Set(p.usage.map(u=>u.materialId||getSpool(u.spoolId)?.materialId).filter(Boolean))];
 function printRow(p,withItem){const c=printCalc(p),multi=db.printers.length>1,sp=usageSpools(p).map(s=>`<a href="#spool/${escape(s.id)}" class="lnk" title="${escape(spName(s))}">${swatch(s,'sm')} ${escape(spName(s))}</a>`).join('<br>')||'<small>не списано</small>';
-  return`<tr><td>${escape(p.date)}</td>${multi&&withItem?`<td><small>${escape(db.printers.find(x=>x.id===p.printerId)?.name||'—')}</small></td>`:''}${withItem?`<td>${db.items.some(i=>i.id===p.itemId)?`<a href="#item/${escape(p.itemId)}" class="lnk">${escape(p.itemName)}</a>`:escape(p.itemName||'—')}</td>`:''}<td>${escape(usageMats(p).map(m=>getMat(m).name).join(' + ')||'—')}</td><td class="num">${p.sets}</td><td class="num">${fmtH(c.hours)}</td><td><span class="pill ${p.result==='fail'?'fail':'done'}">${p.result==='fail'?'✕ Неудачно':'✓ Успешно'}</span></td><td class="num">${fmt(c.grams,1)} г</td><td class="num">${money(c.total)}</td><td>${sp}</td><td>${escape(p.note)}</td><td style="white-space:nowrap"><button class="iconbtn" data-linkprint="${escape(p.id)}" title="Привязать к изделию">⛓</button> <button class="iconbtn" data-repeat="${escape(p.id)}" title="Повторить печать с теми же параметрами">↻</button> <button class="iconbtn danger" data-delprint="${escape(p.id)}" title="Удалить запись (вернёт граммы на катушки)">×</button></td></tr>`}
+  return`<tr><td>${escape(p.date)}</td>${multi&&withItem?`<td><small>${escape(db.printers.find(x=>x.id===p.printerId)?.name||'—')}</small></td>`:''}${withItem?`<td>${(im=>im?`<span class="thumb xs">${imgTag(im)}</span>`:'')(printImgSrc(p))}${db.items.some(i=>i.id===p.itemId)?`<a href="#item/${escape(p.itemId)}" class="lnk">${escape(p.itemName)}</a>`:escape(p.itemName||'—')}${(pt=>pt?`<br><small>◧ ${escape(pt.name||'элемент')}</small>`:'')(p.partId&&db.items.find(i=>i.id===p.itemId)?.parts.find(x=>x.id===p.partId))}</td>`:''}<td>${escape(usageMats(p).map(m=>getMat(m).name).join(' + ')||'—')}</td><td class="num">${p.sets}</td><td class="num">${fmtH(c.hours)}</td><td><span class="pill ${p.result==='fail'?'fail':'done'}">${p.result==='fail'?'✕ Неудачно':'✓ Успешно'}</span></td><td class="num">${fmt(c.grams,1)} г</td><td class="num">${money(c.total)}</td><td>${sp}</td><td>${escape(p.note)}</td><td style="white-space:nowrap"><button class="iconbtn" data-linkprint="${escape(p.id)}" title="Привязать к изделию">⛓</button> <button class="iconbtn" data-repeat="${escape(p.id)}" title="Повторить печать с теми же параметрами">↻</button> <button class="iconbtn danger" data-delprint="${escape(p.id)}" title="Удалить запись (вернёт граммы на катушки)">×</button></td></tr>`}
 const LOG_HEAD=(withItem,multi)=>`<tr><th>Дата</th>${multi&&withItem?'<th>Принтер</th>':''}${withItem?'<th>Изделие</th>':''}<th>Материал</th><th class="num">Компл.</th><th class="num">Время</th><th>Результат</th><th class="num">Филамент</th><th class="num">Себестоимость</th><th>Катушки</th><th>Комментарий</th><th></th></tr>`;
 function repeatPrint(id){const p=db.prints.find(x=>x.id===id);if(!p)return;const low=p.usage.map(u=>getSpool(u.spoolId)).filter(s=>s&&spoolState(s).remaining<number(p.usage.find(u=>u.spoolId===s.id).grams));
   if(!confirm(`Повторить печать «${p.itemName}» сегодня с теми же параметрами?\n${p.sets>1?p.sets+' компл. · ':''}${fmtH(printHours(p))} · ${fmt(printGrams(p),1)} г${low.length?`\n\n⚠ На катушке не хватает пластика: ${low.map(spName).join(', ')}`:''}`))return;
-  const np=normPrint({...structuredClone(p),id:'',src:'',at:now(),date:today(),result:'ok',hours:printHours(p)});db.prints.push(np);persist();renderList();if(currentPage==='item')renderItemPrints();setStatus('Печать повторена и записана')}
+  const np=normPrint({...structuredClone(p),id:'',src:'',cover:'',at:now(),date:today(),result:'ok',hours:printHours(p)});db.prints.push(np);persist();renderList();if(currentPage==='item')renderItemPrints();setStatus('Печать повторена и записана')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-repeat]');if(b){e.preventDefault();repeatPrint(b.dataset.repeat)}});
 function delPrint(id){if(!confirm('Удалить запись? Списанные граммы вернутся на катушки.'))return;db.prints=db.prints.filter(p=>p.id!==id);persist();renderList();if(currentPage==='item')renderItemPrints()}
 $('logRows').onclick=e=>{const id=e.target.dataset.delprint;if(id)delPrint(id)};
 
 function renderItemPrints(){const it=item();if(!it)return;$('itTabLogN').textContent=printsOf(it.id).length||'';const list=db.prints.filter(p=>p.itemId===it.id).sort((a,b)=>(b.date+b.at).localeCompare(a.date+a.at));
-  const ok=list.filter(p=>p.result==='ok').reduce((a,p)=>a+p.sets,0),fail=list.filter(p=>p.result==='fail').length;
-  $('itPrintSum').textContent=list.length?`Напечатано комплектов: ${ok}${fail?` · неудачных печатей: ${fail}`:''}`:'Ещё не печаталось. Запись спишет пластик с катушек.';
-  $('itPrints').innerHTML=list.length?`<div class="timeline" style="margin:0">${list.map(p=>tlItem(p,true)).join('')}</div>`:''}
+  const D=itemDone(it),fail=list.filter(p=>p.result==='fail').length,byPart=it.parts.length>1||list.some(p=>p.partId);
+  $('itPrintSum').textContent=list.length?`Напечатано комплектов: ${D.sets}${byPart?' · по элементам: '+it.parts.map(x=>`${x.name||'элемент'} — ${D.pcs.get(x.id)} шт${x.qty>1?` (по ${x.qty} в комплекте)`:''}`).join(', '):''}${fail?` · неудачных печатей: ${fail}`:''}`:'Ещё не печаталось. Запись спишет пластик с катушек.';
+  $('itPrints').innerHTML=list.length?`<div class="timeline" style="margin:0">${list.map(p=>tlItem(p,true)).join('')}</div>`:'';hydrate($('itPrints'))}
 let printFormFor=null;
 // Строки списания строятся из элементов изделия. keep=true — перестроить с сохранением выбранных катушек и вручную изменённых граммов
 function buildPfRows(keep){const it=item();if(!it)return;const prev=new Map();
@@ -706,7 +708,7 @@ $('itPrints').onclick=e=>{const id=e.target.closest('[data-delprint]')?.dataset.
 /* ================= Выбор изделия для «Записать печать» ================= */
 function lastPrintDate(id){return printsOf(id).reduce((a,p)=>p.date>a?p.date:a,'')}
 function renderPick(){const q=$('pickSearch').value.trim().toLowerCase();const list=db.items.filter(x=>(x.name+' '+x.tags.join(' ')).toLowerCase().includes(q)).sort((a,b)=>lastPrintDate(b.id).localeCompare(lastPrintDate(a.id))||(b.updatedAt||'').localeCompare(a.updatedAt||''));
-  $('pickList').innerHTML=list.length?list.slice(0,60).map(x=>{const lp=lastPrintDate(x.id);return`<button type="button" class="pick-row" data-pick="${escape(x.id)}"><span class="thumb">${x.cover?`<img data-photo="${escape(x.cover)}" alt="">`:'◈'}</span><span><b>${escape(x.name)}</b><br><small>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}${lp?' · печаталось '+lp:''}</small></span><small>${money(calcItem(x).total)}</small></button>`}).join(''):`<div class="empty" style="margin:6px 0">${db.items.length?'Ничего не найдено.':'Изделий пока нет.'}<div class="buttons"><button type="button" id="pickNew">+ Создать изделие</button></div></div>`;hydrate($('pickList'))}
+  $('pickList').innerHTML=list.length?list.slice(0,60).map(x=>{const lp=lastPrintDate(x.id);return`<button type="button" class="pick-row" data-pick="${escape(x.id)}"><span class="thumb">${coverImg(x)}</span><span><b>${escape(x.name)}</b><br><small>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}${lp?' · печаталось '+lp:''}</small></span><small>${money(calcItem(x).total)}</small></button>`}).join(''):`<div class="empty" style="margin:6px 0">${db.items.length?'Ничего не найдено.':'Изделий пока нет.'}<div class="buttons"><button type="button" id="pickNew">+ Создать изделие</button></div></div>`;hydrate($('pickList'))}
 function openPick(){if(!db.items.length){if(confirm('В каталоге пока нет изделий. Создать новое?'))createBlankItem();return}$('pickSearch').value='';renderPick();$('pickDlg').showModal();setTimeout(()=>$('pickSearch').focus(),30)}
 $('pickSearch').oninput=renderPick;$('pickClose').onclick=()=>$('pickDlg').close();
 $('pickDlg').addEventListener('click',e=>{if(e.target===$('pickDlg')){$('pickDlg').close();return}const b=e.target.closest('[data-pick]');if(b){$('pickDlg').close();openItemPrint(b.dataset.pick)}if(e.target.id==='pickNew'){$('pickDlg').close();createBlankItem()}});
@@ -735,7 +737,7 @@ function vChart(cols,metric){// cols: [{label,tip,ok,fail,cost}]
 function renderDash(){renderDashPrinter();
   $('dType').value=dash.type;$('dLabel').textContent=dashLabel();$('dPrev').disabled=dash.type==='all';$('dNext').disabled=isFuture();
   const list=db.prints.filter(inDash),S={n:list.length,ok:0,fail:0,sets:0,hours:0,grams:0,plastic:0,power:0,depreciation:0,maintenance:0,total:0,failCost:0,items:new Set(),byMat:{}};
-  for(const p of list){const c=printCalc(p);if(p.result==='fail'){S.fail++;S.failCost+=c.total}else{S.ok++;S.sets+=p.sets;S.items.add(p.itemId)}S.hours+=c.hours;S.grams+=c.grams;for(const k of ['plastic','power','depreciation','maintenance','total'])S[k]+=c[k];for(const [m,v] of Object.entries(c.byMat)){const b=S.byMat[m]??={grams:0,cost:0};b.grams+=v.grams;b.cost+=v.cost}}
+  for(const p of list){const c=printCalc(p);if(p.result==='fail'){S.fail++;S.failCost+=c.total}else{S.ok++;S.sets+=p.partId?0:p.sets;S.items.add(p.itemId)}S.hours+=c.hours;S.grams+=c.grams;for(const k of ['plastic','power','depreciation','maintenance','total'])S[k]+=c[k];for(const [m,v] of Object.entries(c.byMat)){const b=S.byMat[m]??={grams:0,cost:0};b.grams+=v.grams;b.cost+=v.cost}}
   $('dashSub').textContent=`Статистика по журналу печати · ${dashLabel().toLowerCase()}`;
   const none=!list.length;$('dashBody').hidden=none;$('dashEmpty').hidden=!none;
   $('dashEmpty').innerHTML=db.prints.length?`<b>За ${dash.type==='month'?MONTHS[dash.m].toLowerCase()+' '+dash.y:dashLabel().toLowerCase()} печатей нет.</b><br>Выберите другой период стрелками или запишите печать.`:'<b>Здесь появится статистика ваших печатей.</b><br>Записывайте каждую печать — успешную или нет: пластик спишется с катушек, а время, расход и себестоимость соберутся здесь по месяцам.<div class="buttons"><button type="button" onclick="document.getElementById(\'qaPrint\').click()">✓ Записать первую печать</button></div>';
@@ -893,13 +895,13 @@ const bbDate=iso=>{const d=new Date(iso);return isNaN(d)?today():d.getFullYear()
 function bbRender(){const show=$('bbShowDone').checked,list=bbTasks.filter(t=>show||!bbImported(t.id));
   const nDone=bbTasks.filter(t=>bbImported(t.id)).length;
   $('bbInfo').textContent=bbTasks.length?`Заданий в облаке: ${bbTasks.length}${nDone?` · уже в журнале: ${nDone}`:''}. Проверьте изделие и катушки — граммы спишутся с выбранных катушек.`:'';
-  const itemOpts=sel=>`<option value="">— без изделия —</option>`+db.items.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(i=>`<option value="${escape(i.id)}"${i.id===sel?' selected':''}>${escape(i.name)}</option>`).join('');
+  const itemOpts=sel=>`<option value="">— без изделия —</option><option value="__new"${sel==='__new'?' selected':''}>＋ Создать новое изделие</option>`+db.items.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(i=>`<option value="${escape(i.id)}"${i.id===sel?' selected':''}>${escape(i.name)}</option>`).join('');
   $('bbList').innerHTML=list.length?list.map(t=>{const st=bbPick.get(t.id),done=bbImported(t.id),run=t.result==='running',dis=run||done;
     return`<div class="bb-row${st.on&&!dis?' on':''}${dis?' dis':''}" data-bt="${escape(t.id)}"><label class="bb-chk"><input type="checkbox" data-bf="on"${st.on&&!dis?' checked':''}${dis?' disabled':''} aria-label="Импортировать"></label>
       <div class="thumb">${t.cover?`<img src="${escape(t.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'◈'}</div>
       <div class="bb-main"><div class="bb-ttl"><b>${escape(t.title)}</b>${run?'<span class="pill wip">печатается</span>':`<span class="pill ${t.result==='fail'?'fail':'done'}">${t.result==='fail'?'✕ Неудачно':'✓ Успешно'}</span>`}${done?'<span class="pill sp-empty">в журнале</span>':''}</div>
         <div class="tl-meta"><span>${t.start?escape(new Date(t.start).toLocaleString('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})):'—'}</span><span>⏱ ${fmtH(t.seconds/3600)}${t.estimated?' <small>(оценка)</small>':''}</span><span>${fmt(t.grams,1)} г</span>${t.plate?`<span>${escape(t.plate)}</span>`:''}${t.deviceName?`<span>${escape(t.deviceName)}</span>`:''}</div>
-        ${dis?'':`<label class="bb-it">Изделие<select data-bf="item">${itemOpts(st.itemId)}</select></label>
+        ${dis?'':`<label class="bb-it">Изделие<select data-bf="item">${itemOpts(st.itemId)}</select></label>${(it=>it?`<label class="bb-it">Что напечатано<select data-bf="part"><option value="">Изделие целиком</option>${it.parts.map(x=>`<option value="${escape(x.id)}"${x.id===st.partId?' selected':''}>Элемент: ${escape(x.name||'без названия')}</option>`).join('')}<option value="__new"${st.partId==='__new'?' selected':''}>＋ Новый элемент «${escape(plateName(t.plate)||cleanName(t.title))}»</option></select></label>`:'')(db.items.find(i=>i.id===st.itemId))}
         ${st.usage.map((u,i)=>`<div class="bb-fil"><span class="swatch sm" style="background:${u.f.color||'var(--faint)'}"></span><small>${escape(u.f.type||'?')}${u.f.slot?' · '+escape(u.f.slot):''}</small><input type="number" min="0" step="0.1" value="${u.grams}" data-bf="g" data-i="${i}" aria-label="Граммы"><small>г</small><select data-bf="use" data-i="${i}">${bbUseOptions(u.pick)}</select></div>`).join('')}
         ${t.result==='fail'&&bbRatio(t)<1?`<small class="muted">Расход уменьшен пропорционально времени: ${Math.round(bbRatio(t)*100)}% от модели.</small>`:''}`}
       </div></div>`}).join(''):`<div class="empty" style="display:block">${bbTasks.length?'Все задания уже импортированы.':'Заданий не найдено.'}</div>`;
@@ -919,13 +921,15 @@ $('bbDlg').addEventListener('click',e=>{if(e.target===$('bbDlg'))$('bbDlg').clos
 $('bbReload').onclick=bbLoad;$('bbShowDone').onchange=bbRender;
 $('bbDevice').onchange=()=>{BB.patch({device:$('bbDevice').value});const lp=db.printers.find(p=>p.bambuDev&&p.bambuDev===$('bbDevice').value);if(lp){$('bbPrinter').value=lp.id;BB.patch({printer:lp.id})}bbLoad()};$('bbPrinter').onchange=()=>BB.patch({printer:$('bbPrinter').value});
 $('bbList').addEventListener('change',e=>{const row=e.target.closest('[data-bt]');if(!row)return;const st=bbPick.get(row.dataset.bt),f=e.target.dataset.bf,i=+e.target.dataset.i;if(!st)return;
-  if(f==='on'){st.on=e.target.checked;row.classList.toggle('on',st.on);bbSelInfo()}else if(f==='item')st.itemId=e.target.value;else if(f==='g')st.usage[i].grams=number(e.target.value);else if(f==='use')st.usage[i].pick=e.target.value});
+  if(f==='on'){st.on=e.target.checked;row.classList.toggle('on',st.on);bbSelInfo()}else if(f==='item'){st.itemId=e.target.value;st.partId='';bbRender()}else if(f==='part')st.partId=e.target.value;else if(f==='g')st.usage[i].grams=number(e.target.value);else if(f==='use')st.usage[i].pick=e.target.value});
 $('bbImport').onclick=()=>{const pid=$('bbPrinter').value,sel=bbTasks.filter(t=>bbPick.get(t.id)?.on&&t.result!=='running'&&!bbImported(t.id));if(!sel.length)return;
   for(const t of sel){const st=bbPick.get(t.id),it=db.items.find(i=>i.id===st.itemId);
-    db.prints.push(normPrint({at:t.start||now(),date:bbDate(t.start),itemId:it?.id||'',itemName:it?.name||t.title,printerId:pid,hours:Math.round(t.seconds/36)/100,sets:1,result:t.result==='fail'?'fail':'ok',src:'bambu:'+t.id,
+    const np=normPrint({at:t.start||now(),plate:t.plate,cover:t.cover,date:bbDate(t.start),itemId:it?.id||'',itemName:it?.name||t.title,printerId:pid,hours:Math.round(t.seconds/36)/100,sets:1,result:t.result==='fail'?'fail':'ok',src:'bambu:'+t.id,
       note:['Bambu Cloud',it&&bbNorm(it.name)!==bbNorm(t.title)?t.title:'',t.plate,t.estimated?'время по оценке слайсера':''].filter(Boolean).join(' · '),
-      usage:st.usage.filter(u=>u.grams>0).map(u=>{const[k,id]=u.pick.split(':');const s=k==='s'?getSpool(id):null;return{label:[u.f.type,u.f.slot].filter(Boolean).join(' · '),materialId:s?s.materialId:id||'',spoolId:s?s.id:'',grams:u.grams}})}))}
-  persist();renderList();if(currentPage==='item')renderItemPrints();$('bbDlg').close();setStatus(`Импортировано записей: ${sel.length}`)};
+      usage:st.usage.filter(u=>u.grams>0).map(u=>{const[k,id]=u.pick.split(':');const s=k==='s'?getSpool(id):null;return{label:[u.f.type,u.f.slot].filter(Boolean).join(' · '),materialId:s?s.materialId:id||'',spoolId:s?s.id:'',grams:u.grams}})});
+    db.prints.push(np);
+    if(st.itemId==='__new')itemFromPrint(np.id,{silent:true});else if(it&&st.partId==='__new')partFromPrint(np.id,it.id,{silent:true});else if(it&&st.partId)np.partId=it.parts.some(x=>x.id===st.partId)?st.partId:''}
+  persist();renderList();if(currentPage==='item')renderItem();$('bbDlg').close();setStatus(`Импортировано записей: ${sel.length}`)};
 bbStateUi();
 
 /* --- Катушки из Bambu Cloud: сверка остатков и создание фирменных катушек --- */
@@ -992,30 +996,108 @@ $('bfApply').onclick=()=>{const sel=bfList.filter(f=>{const st=bfPick.get(f.key)
   setStatus([upd&&`Обновлено катушек: ${upd}`,created&&`создано: ${created}`].filter(Boolean).join(' · ')||'Готово');
   if(newMats.length)alert(`Добавлены материалы без цены: ${newMats.join(', ')}.\nУкажите цену в «Настройки → Материалы» или цену катушки в её карточке.`)};
 
-/* --- Привязка записи журнала к изделию --- */
-let linkPid='';
-function renderLinkList(){const p=db.prints.find(x=>x.id===linkPid);if(!p)return;const q=$('linkSearch').value.trim().toLowerCase(),hint=bbNorm(p.itemName);
+/* --- Привязка записи журнала к изделию и его элементу --- */
+let linkPid='',linkItem='';
+const cleanName=s=>String(s||'').replace(/\.(gcode\.)?3mf$/i,'').trim();
+const plateName=pl=>/^plate\s*\d+$/i.test(String(pl||'').trim())?'':cleanName(pl);
+function renderLinkList(){const p=db.prints.find(x=>x.id===linkPid);if(!p)return;
+  if(linkItem){const it=db.items.find(i=>i.id===linkItem);if(!it){linkItem='';return renderLinkList()}
+    $('linkTitle').textContent='Элемент изделия';$('linkSearch').hidden=true;$('linkNew').hidden=true;$('linkBack').hidden=false;$('linkNone').hidden=true;
+    $('linkSub').innerHTML=`<b>${escape(it.name)}</b> — что напечатано этой печатью: всё изделие или один из элементов?`;
+    const cur=p.itemId===it.id?p.partId:null;
+    $('linkList').innerHTML=`<button type="button" class="pick-row${cur===''?' on':''}" data-linkpart=""><span class="thumb">▦</span><span><b>Изделие целиком</b><br><small>${it.parts.length} ${plural(it.parts.length,'элемент','элемента','элементов')} · комплектов: ${p.sets}</small></span><small></small></button>`+
+      it.parts.map(pt=>`<button type="button" class="pick-row${cur===pt.id?' on':''}" data-linkpart="${escape(pt.id)}"><span class="thumb">◧</span><span><b>${escape(pt.name||'Элемент')}</b><br><small>${pt.qty>1?pt.qty+' шт в комплекте · ':''}${fmtH(number(pt.hours))} · ${fmt(pt.filaments.reduce((a,f)=>a+number(f.grams),0),1)} г на 1 шт</small></span><small>${cur===pt.id?'привязано':''}</small></button>`).join('')+
+      `<button type="button" class="pick-row" data-linkpart="__new"><span class="thumb">＋</span><span><b>Новый элемент из этой печати</b><br><small>«${escape(plateName(p.plate)||cleanName(p.itemName)||'Элемент')}» · ${fmtH(printHours(p)/Math.max(1,p.sets))} · ${fmt(printGrams(p)/Math.max(1,p.sets),1)} г</small></span><small></small></button>`;return}
+  $('linkTitle').textContent='Изделие для печати';$('linkSearch').hidden=false;$('linkNew').hidden=false;$('linkBack').hidden=true;$('linkNone').hidden=!p.itemId;
+  $('linkSub').textContent=`${dayTitle(p.date)} · ${p.itemName||'без названия'}${p.plate?' · '+p.plate:''} · ${fmtH(printHours(p))} · ${fmt(printGrams(p),1)} г`;
+  const q=$('linkSearch').value.trim().toLowerCase(),hint=bbNorm(p.itemName);
   const list=db.items.filter(x=>(x.name+' '+x.tags.join(' ')).toLowerCase().includes(q)).sort((a,b)=>(b.id===p.itemId)-(a.id===p.itemId)||(bbNorm(b.name)===hint)-(bbNorm(a.name)===hint)||(b.updatedAt||'').localeCompare(a.updatedAt||''));
-  $('linkList').innerHTML=list.length?list.slice(0,80).map(x=>`<button type="button" class="pick-row${x.id===p.itemId?' on':''}" data-linkto="${escape(x.id)}"><span class="thumb">${x.cover?`<img data-photo="${escape(x.cover)}" alt="">`:'◈'}</span><span><b>${escape(x.name)}</b><br><small>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}${x.id===p.itemId?' · привязано сейчас':''}</small></span><small>${money(calcItem(x).total)}</small></button>`).join(''):`<div class="empty" style="margin:6px 0">${db.items.length?'Ничего не найдено.':'Изделий пока нет.'}</div>`;hydrate($('linkList'))}
-function openLink(pid){const p=db.prints.find(x=>x.id===pid);if(!p)return;linkPid=pid;
-  $('linkSub').textContent=`${dayTitle(p.date)} · ${p.itemName||'без названия'} · ${fmtH(printHours(p))} · ${fmt(printGrams(p),1)} г`;$('linkNone').hidden=!p.itemId;
-  $('linkSearch').value='';renderLinkList();$('linkDlg').showModal();setTimeout(()=>$('linkSearch').focus(),30)}
-function linkPrint(pid,itemId){const p=db.prints.find(x=>x.id===pid);if(!p)return;
-  if(p.hours==null)p.hours=printHours(p); // время фиксируется, чтобы смена изделия не меняла себестоимость записи
-  const it=db.items.find(i=>i.id===itemId),orig=p.itemName;
-  const ORIG=/(?:^| · )исходно: ([^·]+?)(?= · |$)/,m=ORIG.exec(p.note);
-  if(it){p.itemId=it.id;p.itemName=it.name;if(!m&&orig&&!ieq(orig,it.name))p.note=[p.note,'исходно: '+orig].filter(Boolean).join(' · ')}
-  else{p.itemId='';if(m){p.itemName=m[1].trim();p.note=p.note.replace(ORIG,'').replace(/^ · /,'')}}
-  persist();renderList();if(currentPage==='item')renderItemPrints();$('linkDlg').close();setStatus(it?`Печать привязана к «${it.name}»`:'Печать отвязана от изделия')}
-function itemFromPrint(pid){const p=db.prints.find(x=>x.id===pid);if(!p)return;const k=Math.max(1,p.sets),by=new Map();
-  for(const u of p.usage){const mid=u.materialId||getSpool(u.spoolId)?.materialId||'';if(mid)by.set(mid,(by.get(mid)||0)+number(u.grams)/k)}
-  const fil=[...by].map(([materialId,g])=>({materialId,grams:Math.round(g*10)/10}));
-  const it=normItem({name:String(p.itemName||'').replace(/\.(gcode\.)?3mf$/i,'').trim()||'Новое изделие',status:'done',printerId:p.printerId,parts:[{name:'Изделие целиком',qty:1,hours:Math.round(printHours(p)/k*10000)/10000,filaments:fil.length?fil:[{materialId:db.materials[0]?.id||'',grams:0}]}]});
-  it.updatedAt=it.createdAt;db.items.unshift(it);linkPrint(pid,it.id);go('item/'+it.id);setStatus('Изделие создано по печати — граммы и время взяты из записи')}
+  $('linkList').innerHTML=list.length?list.slice(0,80).map(x=>`<button type="button" class="pick-row${x.id===p.itemId?' on':''}" data-linkto="${escape(x.id)}"><span class="thumb">${coverImg(x)}</span><span><b>${escape(x.name)}</b><br><small>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))} · элементов: ${x.parts.length}${x.id===p.itemId?' · привязано сейчас':''}</small></span><small>${money(calcItem(x).total)}</small></button>`).join(''):`<div class="empty" style="margin:6px 0">${db.items.length?'Ничего не найдено.':'Изделий пока нет.'}</div>`;hydrate($('linkList'))}
+function openLink(pid){const p=db.prints.find(x=>x.id===pid);if(!p)return;linkPid=pid;linkItem='';$('linkSearch').value='';renderLinkList();$('linkDlg').showModal();setTimeout(()=>$('linkSearch').focus(),30)}
+// Привязать без сохранения (общая логика для журнала, импорта и моделей из облака)
+function applyLink(p,it,partId=''){if(p.hours==null)p.hours=printHours(p); // время фиксируется, чтобы смена изделия не меняла себестоимость записи
+  const ORIG=/(?:^| · )исходно: ([^·]+?)(?= · |$)/,m=ORIG.exec(p.note),orig=p.itemName;
+  if(it){p.itemId=it.id;p.itemName=it.name;p.partId=it.parts.some(x=>x.id===partId)?partId:'';if(!m&&orig&&!ieq(cleanName(orig),cleanName(it.name)))p.note=[p.note,'исходно: '+orig].filter(Boolean).join(' · ')}
+  else{p.itemId='';p.partId='';if(m){p.itemName=m[1].trim();p.note=p.note.replace(ORIG,'').replace(/^ · /,'')}}}
+function linkPrint(pid,itemId,partId=''){const p=db.prints.find(x=>x.id===pid);if(!p)return;const it=db.items.find(i=>i.id===itemId);applyLink(p,it,partId);
+  persist();renderList();if(currentPage==='item')renderItem();$('linkDlg').close();const pt=it?.parts.find(x=>x.id===p.partId);setStatus(it?`Печать привязана к «${it.name}»${pt?' · '+(pt.name||'элемент'):''}`:'Печать отвязана от изделия')}
+function filamentsOfPrint(p){const k=Math.max(1,p.sets),by=new Map();for(const u of p.usage){const mid=u.materialId||getSpool(u.spoolId)?.materialId||'';if(mid)by.set(mid,(by.get(mid)||0)+number(u.grams)/k)}
+  const fil=[...by].map(([materialId,g])=>({materialId,grams:Math.round(g*10)/10}));return fil.length?fil:[{materialId:db.materials[0]?.id||'',grams:0}]}
+const partOfPrint=(p,name)=>({id:shortId(),name:name??(plateName(p.plate)||'Изделие целиком'),qty:1,hours:Math.round(printHours(p)/Math.max(1,p.sets)*10000)/10000,filaments:filamentsOfPrint(p)});
+// Новое изделие по печати. silent — без перехода в карточку (импорт)
+function itemFromPrint(pid,{silent=false}={}){const p=db.prints.find(x=>x.id===pid);if(!p)return null;
+  const it=normItem({name:cleanName(p.itemName)||'Новое изделие',status:'done',printerId:p.printerId,coverUrl:p.cover,parts:[partOfPrint(p,plateName(p.plate)||'Изделие целиком')]});
+  it.updatedAt=it.createdAt;db.items.unshift(it);applyLink(p,it,'');if(p.cover)savePhotoFromUrl(it,p.cover);
+  if(!silent){persist();renderList();$('linkDlg').close();go('item/'+it.id);setStatus('Изделие создано по печати — граммы и время взяты из записи')}return it}
+// Новый элемент в изделии по печати
+function partFromPrint(pid,itemId,{silent=false}={}){const p=db.prints.find(x=>x.id===pid),it=db.items.find(i=>i.id===itemId);if(!p||!it)return null;
+  const pt=partOfPrint(p,plateName(p.plate)||cleanName(p.itemName)||'Элемент');it.parts.push(pt);touch(it);applyLink(p,it,pt.id);
+  if(!silent){persist();renderList();if(currentPage==='item')renderItem();$('linkDlg').close();setStatus(`Элемент «${pt.name}» добавлен в «${it.name}» и привязан к печати`)}return pt}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-linkprint]');if(b){e.preventDefault();e.stopPropagation();openLink(b.dataset.linkprint)}},true);
-$('linkSearch').oninput=renderLinkList;$('linkClose').onclick=()=>$('linkDlg').close();
-$('linkDlg').addEventListener('click',e=>{if(e.target===$('linkDlg')){$('linkDlg').close();return}const b=e.target.closest('[data-linkto]');if(b)linkPrint(linkPid,b.dataset.linkto)});
+$('linkSearch').oninput=renderLinkList;$('linkClose').onclick=()=>$('linkDlg').close();$('linkBack').onclick=()=>{linkItem='';renderLinkList()};
+$('linkDlg').addEventListener('click',e=>{if(e.target===$('linkDlg')){$('linkDlg').close();return}
+  const b=e.target.closest('[data-linkto]');if(b){linkItem=b.dataset.linkto;renderLinkList();return}
+  const pp=e.target.closest('[data-linkpart]');if(pp){const v=pp.dataset.linkpart;if(v==='__new')partFromPrint(linkPid,linkItem);else linkPrint(linkPid,linkItem,v)}});
 $('linkNone').onclick=()=>linkPrint(linkPid,'');$('linkNew').onclick=()=>itemFromPrint(linkPid);
+
+/* --- картинки из Bambu Cloud --- */
+// Скачать картинку через Worker и сохранить фото изделия в хранилище (папка / Google Drive)
+async function savePhotoFromUrl(it,url){if(!url||!store||!stReady||!BB.proxy())return false;
+  try{const raw=await BB.image(url),blob=await shrinkImage(raw),ext=blob.type==='image/png'?'png':blob.type==='image/webp'?'webp':'jpg',pid=shortId(),file=`${it.id.slice(0,8)}-${pid}.${ext}`;
+    await store.putPhoto(file,blob);it.photos.push({id:pid,file});if(!it.cover)it.cover=file;photoUrls.set(file,Promise.resolve(URL.createObjectURL(blob)));persist();renderList();if(currentPage==='item'&&currentItemId===it.id)renderItem();return true}
+  catch{return false}}
+const printImgSrc=p=>{if(p.cover)return{url:p.cover};const it=db.items.find(i=>i.id===p.itemId);return it?.cover?{photo:it.cover}:it?.coverUrl?{url:it.coverUrl}:null};
+const imgTag=s=>s.photo?`<img data-photo="${escape(s.photo)}" alt="">`:`<img src="${escape(s.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`;
+function itemDone(it){const pcs=new Map(it.parts.map(x=>[x.id,0]));
+  for(const p of db.prints){if(p.itemId!==it.id||p.result!=='ok')continue;if(p.partId){if(pcs.has(p.partId))pcs.set(p.partId,pcs.get(p.partId)+p.sets)}else for(const x of it.parts)pcs.set(x.id,pcs.get(x.id)+p.sets*Math.max(1,x.qty))}
+  return{sets:it.parts.length?Math.min(...it.parts.map(x=>Math.floor(pcs.get(x.id)/Math.max(1,x.qty)))):0,pcs}}
+
+/* --- модели из истории Bambu Cloud → каталог изделий --- */
+let bmGroups=[],bmPick=new Map();
+const bmKey=t=>t.designId?'d:'+t.designId:t.modelId?'m:'+t.modelId:'t:'+bbNorm(t.title);
+const mwUrl=id=>`https://makerworld.com/models/${id}`;
+function bmBuild(tasks){const g=new Map();
+  for(const t of tasks.slice().sort((a,b)=>String(b.start).localeCompare(String(a.start)))){if(t.result==='running')continue;const k=bmKey(t);let x=g.get(k);
+    if(!x){x={key:k,title:t.title,designId:t.designId,cover:'',tasks:[],plates:new Map(),ok:0,fail:0,last:t.start};g.set(k,x)}
+    x.tasks.push(t);if(!x.cover&&t.cover)x.cover=t.cover;t.result==='ok'?x.ok++:x.fail++;
+    const pk=t.plateIdx?'p'+t.plateIdx:t.plate?'n:'+t.plate.toLowerCase():'p1';let pl=x.plates.get(pk);if(!pl){pl={key:pk,name:t.plate||(t.plateIdx?'Plate '+t.plateIdx:'Стол 1'),tasks:[],best:null};x.plates.set(pk,pl)}
+    pl.tasks.push(t);if(!pl.best||(pl.best.result!=='ok'&&t.result==='ok')||(pl.best.estimated&&!t.estimated&&t.result==='ok'))pl.best=t}
+  return[...g.values()]}
+const bmItem=x=>db.items.find(i=>i.bambuKey===x.key)||null;
+const bmPrints=x=>{const ids=new Set(x.tasks.map(t=>'bambu:'+t.id));return db.prints.filter(p=>ids.has(p.src))};
+function bmDefault(x){const ex=bmItem(x)||db.items.find(i=>i.id===bbMatchItem(x.tasks[0]));return{on:!bmItem(x),target:ex?ex.id:'new',links:true}}
+function bmRender(){const show=$('bmShowDone').checked,rows=bmGroups.filter(x=>show||!bmItem(x));
+  $('bmInfo').textContent=bmGroups.length?`Моделей в истории: ${bmGroups.length} (по последним ${bbTasks.length||100} заданиям) · уже в каталоге: ${bmGroups.filter(bmItem).length}.`:'';
+  $('bmList').innerHTML=rows.length?rows.map(x=>{const st=bmPick.get(x.key),linked=bmItem(x),pr=bmPrints(x),free=pr.filter(p=>!p.itemId).length,pls=[...x.plates.values()];
+    return`<div class="bb-row${st.on?' on':''}" data-bm="${escape(x.key)}"><label class="bb-chk"><input type="checkbox" data-bmf="on"${st.on?' checked':''} aria-label="Выбрать"></label>
+      <div class="thumb">${x.cover?`<img src="${escape(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'◈'}</div>
+      <div class="bb-main"><div class="bb-ttl"><b>${escape(x.title)}</b>${linked?`<span class="pill done">в каталоге</span>`:''}${x.designId?`<a class="lnk" href="${mwUrl(x.designId)}" target="_blank" rel="noopener" style="font-size:12px">MakerWorld ↗</a>`:''}</div>
+        <div class="tl-meta"><span>печатей: ${x.tasks.length} (✓ ${x.ok}${x.fail?` · ✕ ${x.fail}`:''})</span><span>последняя ${x.last?escape(new Date(x.last).toLocaleDateString('ru-RU')):'—'}</span><span>${pls.length>1?`столов: ${pls.length}`:'1 стол'}</span>${pr.length?`<span>в журнале: ${pr.length}${free?` · без изделия: ${free}`:''}</span>`:''}</div>
+        <div class="bm-plates">${pls.map(pl=>`<span class="pill sp-empty">${escape(pl.name)} · ${fmtH(pl.best.seconds/3600)} · ${fmt(pl.best.grams,0)} г</span>`).join(' ')}</div>
+        <label class="bb-it">Изделие<select data-bmf="target"><option value="new"${st.target==='new'?' selected':''}>＋ Создать изделие${pls.length>1?` (${pls.length} элемента по столам)`:''}</option>${db.items.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(i=>`<option value="${escape(i.id)}"${i.id===st.target?' selected':''}>Связать с: ${escape(i.name)}</option>`).join('')}</select></label>
+        ${pr.length?`<label class="check" style="margin-top:6px"><input type="checkbox" data-bmf="links"${st.links?' checked':''}> привязать записи журнала (${pr.length}) к изделию${pls.length>1?' и элементам по столам':''}</label>`:''}</div></div>`}).join(''):`<div class="empty" style="display:block">${bmGroups.length?'Все модели уже в каталоге.':'В истории Bambu Cloud нет завершённых печатей.'}</div>`;
+  const n=rows.filter(x=>bmPick.get(x.key).on).length;$('bmSelInfo').textContent=n?`Выбрано: ${n}`:'Ничего не выбрано';$('bmApply').disabled=!n}
+async function bmLoad(){$('bmList').innerHTML='<div class="empty" style="display:block">Загрузка истории из Bambu Cloud…</div>';$('bmApply').disabled=true;$('bmInfo').textContent='';
+  try{bbTasks=await BB.tasks({limit:100});bmGroups=bmBuild(bbTasks);bmPick=new Map(bmGroups.map(x=>[x.key,bmDefault(x)]));bmRender()}
+  catch(e){$('bmList').innerHTML=`<div class="empty" style="display:block">${escape(e.message)}</div>`;if(e.code==='auth')bbStateUi()}}
+function bmOpen(){if(!BB.connected()){go('settings');setTimeout(()=>$('bambuPanel').scrollIntoView({block:'start',behavior:'smooth'}),80);setStatus('Сначала подключите Bambu Lab Cloud');return}$('bmDlg').showModal();bmLoad()}
+function bmFils(t){const by=new Map();for(const f of t.filaments){const mid=bbMatchMat(f.type)||db.materials[0]?.id||'';by.set(mid,(by.get(mid)||0)+f.grams)}
+  if(!by.size&&t.grams)by.set(db.materials[0]?.id||'',t.grams);return[...by].map(([materialId,g])=>({materialId,grams:Math.round(g*10)/10}))}
+$('bmApply').onclick=async()=>{const sel=bmGroups.filter(x=>bmPick.get(x.key).on);if(!sel.length)return;let made=0,linkedN=0,printsN=0;const photos=[];
+  for(const x of sel){const st=bmPick.get(x.key),pls=[...x.plates.values()];let it,partOf=()=>'';
+    if(st.target==='new'){const parts=pls.map(pl=>({id:shortId(),name:pls.length>1?cleanName(pl.name):'Изделие целиком',qty:1,hours:Math.round(pl.best.seconds/36)/100,filaments:bmFils(pl.best).length?bmFils(pl.best):[{materialId:db.materials[0]?.id||'',grams:0}]}));
+      it=normItem({name:cleanName(x.title),status:'done',coverUrl:x.cover,bambuKey:x.key,parts,links:x.designId?[{title:'MakerWorld',url:mwUrl(x.designId)}]:[],notes:'Создано из истории Bambu Cloud'});
+      it.updatedAt=it.createdAt;db.items.unshift(it);made++;if(x.cover)photos.push([it,x.cover]);
+      const map=new Map(pls.map((pl,i)=>[pl.key,it.parts[i].id]));partOf=t=>pls.length>1?map.get(pls.find(pl=>pl.tasks.includes(t))?.key)||'':''}
+    else{it=db.items.find(i=>i.id===st.target);if(!it)continue;it.bambuKey=x.key;if(!it.coverUrl&&x.cover)it.coverUrl=x.cover;if(!it.cover&&x.cover)photos.push([it,x.cover]);linkedN++;
+      partOf=t=>{const pl=pls.find(q=>q.tasks.includes(t));return pl&&pls.length>1?(it.parts.find(pt=>ieq(pt.name,pl.name)||ieq(pt.name,cleanName(pl.name)))?.id||''):''}}
+    if(st.links)for(const p of bmPrints(x)){if(p.itemId&&p.itemId!==it.id)continue;const t=x.tasks.find(t=>'bambu:'+t.id===p.src);applyLink(p,it,partOf(t));printsN++}}
+  persist();renderList();$('bmDlg').close();setStatus([made&&`Создано изделий: ${made}`,linkedN&&`связано: ${linkedN}`,printsN&&`привязано печатей: ${printsN}`].filter(Boolean).join(' · ')||'Готово');
+  for(const [it,url] of photos)await savePhotoFromUrl(it,url)};
+$('bmOpen').onclick=bmOpen;$('bmClose').onclick=()=>$('bmDlg').close();$('bmDlg').addEventListener('click',e=>{if(e.target===$('bmDlg'))$('bmDlg').close()});
+$('bmReload').onclick=bmLoad;$('bmShowDone').onchange=bmRender;
+$('bmList').addEventListener('change',e=>{const row=e.target.closest('[data-bm]');if(!row)return;const st=bmPick.get(row.dataset.bm),f=e.target.dataset.bmf;if(!st)return;
+  if(f==='on'){st.on=e.target.checked;bmRender()}else if(f==='target')st.target=e.target.value;else if(f==='links')st.links=e.target.checked});
 
 /* ================= Принтер: наработка, обслуживание, Bambu Cloud ================= */
 // Регламент Bambu Lab для P2S (wiki.bambulab.com/en/p2s, раздел Maintenance).

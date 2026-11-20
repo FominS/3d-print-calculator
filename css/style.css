@@ -434,3 +434,11 @@ details.save-more{margin:0}details.save-more>summary{font-size:15px;color:var(--
 @media(max-width:700px){.mhead{grid-template-columns:1fr auto}.mhead .pill{grid-column:1/-1}.mset{margin-left:0}}
 .dpr-h strong{white-space:nowrap}
 @media(max-width:600px){.dpr-head{flex-direction:column}.dpr-h{text-align:left}}
+
+/* Картинки печати в журнале, модели из облака */
+.tl-item.has-img{grid-template-columns:52px 1fr auto}
+.tl-img{position:relative;width:52px;height:52px;border-radius:10px;background:var(--sub);overflow:hidden}.tl-img img{width:100%;height:100%;object-fit:cover;display:block}
+.tl-img .ricon{position:absolute;right:2px;bottom:2px;width:18px!important;height:18px!important;font-size:10px;box-shadow:0 0 0 2px var(--panel)}
+.thumb.xs{width:28px;height:28px;display:inline-grid;vertical-align:middle;margin-right:7px;border-radius:6px}.thumb.xs img,.thumb img{width:100%;height:100%;object-fit:cover}
+.bm-plates{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+@media(max-width:600px){.tl-item.has-img{grid-template-columns:52px 1fr}}

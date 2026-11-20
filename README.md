@@ -51,7 +51,8 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Timeline, by month, by year or as a table, with filters by result and item.
 - Each record stores the print time. Success or failure is set with one button, and ↻ repeats a print with the same spools, grams and time.
 - "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
-- Any record can be linked to a catalog item (⛓), unlinked, or turned into a new item using the print's grams and time.
+- Any record can be linked to a catalog item (⛓) as a whole set or to a single part (plate), or turned into a new part or a new item using the print's grams and time. Sets are counted per part.
+- Bambu Cloud task images in the log; Items → ⇣ Models from Bambu Cloud creates items from print history: model with image, plates as parts, MakerWorld link.
 - View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.
 - **Import from Bambu Lab Cloud** (P2S, P1S, X1, A1): your printer's print history is pulled into the log with real print time, result and per-AMS-slot filament usage. Items and spools are matched automatically by model name, filament type and color. Works through a free Cloudflare Worker, see [docs/bambu-cloud-setup.md](docs/bambu-cloud-setup.md).
 - **Spool sync with Bambu Cloud** (Spools → ⇣ Sync with Bambu Cloud): remaining weight of Bambu Lab RFID spools as reported by the AMS is recorded as a "set remaining" entry, and missing spools are created automatically.

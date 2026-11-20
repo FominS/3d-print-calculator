@@ -13,6 +13,7 @@
  *   GET  /v1/design-user-service/my/filament/v2 — катушки Bambu Lab из AMS (RFID)
  *   GET  /v1/iot-service/api/user/device/version — прошивка принтера и обновления
  *   GET  /v1/iot-service/api/user/print          — текущая печать
+ *   GET  /img?u=<https-url>                       — картинка из хранилищ Bambu (обложки заданий)
  *
  * Регион: заголовок X-Bambu-Region: cn — запрос уйдёт на api.bambulab.cn, иначе api.bambulab.com.
  *
@@ -34,6 +35,8 @@ const ROUTES = {
 };
 const HOSTS = { global: 'https://api.bambulab.com', cn: 'https://api.bambulab.cn' };
 const DEFAULT_ORIGINS = 'https://fomins.github.io';
+// Картинки — только с хостов Bambu Lab / MakerWorld и их бакетов (bbl-*.aliyuncs.com)
+const IMG_HOST = /(^|\.)(bambulab\.com|bambulab\.cn|bblmw\.com|makerworld\.com|makerworld\.com\.cn)$|^bbl[a-z0-9-]*\.oss-[a-z0-9-]+\.aliyuncs\.com$/i;
 
 function cors(origin) {
   return {
@@ -47,6 +50,19 @@ function cors(origin) {
 const json = (status, body, headers) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
 
+async function image(u, h) {
+  let t;
+  try { t = new URL(u); } catch { return json(400, { error: 'bad url' }, h); }
+  if (t.protocol !== 'https:' || !IMG_HOST.test(t.hostname)) return json(403, { error: 'host not allowed' }, h);
+  let res;
+  try { res = await fetch(t.toString(), { headers: { 'User-Agent': '3d-print-calculator-proxy/1.0' }, redirect: 'follow' }); }
+  catch { return json(502, { error: 'upstream unreachable' }, h); }
+  const ct = res.headers.get('Content-Type') || '';
+  if (!res.ok || !/^image\//.test(ct)) return json(502, { error: 'not an image', status: res.status }, h);
+  if (Number(res.headers.get('Content-Length')) > 8e6) return json(413, { error: 'image too large' }, h);
+  return new Response(res.body, { status: 200, headers: { ...h, 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' } });
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -56,6 +72,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
 
     const url = new URL(request.url);
+    if (url.pathname === '/img' && request.method === 'GET') return image(url.searchParams.get('u'), h);
     const method = ROUTES[url.pathname];
     if (!method || method !== request.method) return json(403, { error: 'route not allowed' }, h);
 
