@@ -35,6 +35,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Print settings, photos (stored in the selected storage, resized to 1600 px) and a cover image.
 - **MakerWorld description generator** (RU/EN) built from parts and print settings.
 - **Assemblies**: nest an item inside another (housing → inner parts) by dragging a card onto another one or with “Part of item” on the item page. Any depth, no cycles. The “whole assembly” cost includes nested items.
+- The item creation date can be changed on the Overview tab.
 - Deleting an item keeps its print log entries (name, time, filament usage) and only drops the link. Nested items move one level up.
 
 ### Filament spools
@@ -54,6 +55,8 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Timeline, by month, by year or as a table, with filters by result and item.
 - Each record stores the print time. Success or failure is set with one button, and ↻ repeats a print with the same spools, grams and time.
 - "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
+- Any record can be edited (✎): date, result, sets, time, printer, note and spool usage. Spool levels are recalculated automatically.
+- When a part is deleted, its records stay with the item marked "part deleted" and no longer count toward printed sets.
 - Any record can be linked to a catalog item (⛓) as a whole set or to a single part (plate), or turned into a new part or a new item using the print's grams and time. Sets are counted per part.
 - Bambu Cloud task images in the log; Items → ⇣ Models from Bambu Cloud creates items from print history: model with image, plates as parts, MakerWorld link.
 - View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.

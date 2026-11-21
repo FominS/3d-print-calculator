@@ -452,6 +452,10 @@ details.save-more{margin:0}details.save-more>summary{font-size:15px;color:var(--
 .rtag.on.pos{background:color-mix(in srgb,var(--pos) 18%,var(--panel));border-color:var(--pos);color:var(--text)}
 .rtag.on.neg{background:color-mix(in srgb,var(--neg) 16%,var(--panel));border-color:var(--neg);color:var(--text)}
 .rtag.sm{cursor:default;padding:2px 8px;font-size:11.5px;display:inline-block;margin:1px 0}.rtag.sm.pos{border-color:color-mix(in srgb,var(--pos) 60%,var(--panel-line))}.rtag.sm.neg{border-color:color-mix(in srgb,var(--neg) 60%,var(--panel-line))}
+/* редактирование записи журнала */
+.pehead{grid-template-columns:150px 110px 1fr 1fr!important;margin-top:12px}.pehead .wide{grid-column:1/-1}
+.perow{grid-template-columns:1fr 1.3fr 150px}.perow .inl .iconbtn{margin-left:auto}
+@media(max-width:800px){.pehead{grid-template-columns:1fr 1fr!important}.perow{grid-template-columns:1fr 1fr}.perow>select:first-child{grid-column:1/-1}}
 /* вложенность изделий */
 .itpath{margin:0 0 2px;font-size:13px;color:var(--muted)}
 .ipath{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
