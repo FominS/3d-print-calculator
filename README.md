@@ -34,6 +34,8 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - **Prototypes**: version, date, filament, spool, time and a "what changed" note.
 - Print settings, photos (stored in the selected storage, resized to 1600 px) and a cover image.
 - **MakerWorld description generator** (RU/EN) built from parts and print settings.
+- **Assemblies**: nest an item inside another (housing → inner parts) by dragging a card onto another one or with “Part of item” on the item page. Any depth, no cycles. The “whole assembly” cost includes nested items.
+- Deleting an item keeps its print log entries (name, time, filament usage) and only drops the link. Nested items move one level up.
 
 ### Filament spools
 - Compact cards or a table, with filters by material, brand and availability. Spools that are running low are highlighted.
@@ -41,6 +43,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Brand, series, color, net weight, diameter, price, store, purchase / opened / dried dates.
 - Remaining amount in grams and meters, a low-stock warning and spool history.
 - Correct the remaining amount manually (grams or meters) or by weighing the spool. The empty spool weight is derived from a new sealed spool.
+- **Spool review**: 1–5 ★ rating, pros and issues tags (stringing, wet, warping, clogs…) and a comment, plus the failed print rate for this spool from the log.
 - **Libraries** in Settings:
   - brands with their filament series;
   - stores;
@@ -65,6 +68,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 ### Statistics
 - Totals and averages, cost structure, by material, by month.
 - Prototype costs, filament in stock and printer wear by depreciation hours, per printer.
+- **Brands and filaments**: average spool rating per brand × material, failed print rate, price per kg, common tags and the best brand per material.
 
 ### Printers
 - Several printers, each with price, lifespan, hours per year, power and maintenance cost. Bambu Lab P2S is the default.

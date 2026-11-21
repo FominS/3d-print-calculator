@@ -42,7 +42,7 @@ function normItem(x){
     print:{nozzle:'0.4',layer:'0.2',infill:'',walls:'',supports:'',plate:'',other:'',...(x.print||{})},
     desc:{lang:'ru',intro:'',hardware:'',assembly:'',tips:'',...(x.desc||{})},
     photos:Array.isArray(x.photos)?x.photos.filter(p=>p&&p.file).map(p=>({id:String(p.id||shortId()),file:String(p.file)})):[],
-    cover:String(x.cover||''),coverUrl:/^https:\/\//.test(x.coverUrl||'')?String(x.coverUrl):'',bambuKey:String(x.bambuKey||'')};
+    cover:String(x.cover||''),coverUrl:/^https:\/\//.test(x.coverUrl||'')?String(x.coverUrl):'',bambuKey:String(x.bambuKey||''),parentId:String(x.parentId||'')};
   if(Array.isArray(x.parts)&&x.parts.length){
     it.parts=x.parts.map(p=>({id:String(p.id||shortId()),name:String(p.name||''),qty:Math.max(1,Math.round(number(p.qty))||1),hours:number(p.hours),
       filaments:(Array.isArray(p.filaments)?p.filaments:[]).map(f=>({materialId:String(f.materialId||''),grams:number(f.grams)}))}));
@@ -63,6 +63,10 @@ function valid(d){
     materials:d.materials.map(m=>({id:String(m.id||uid()),name:String(m.name||'?'),price:number(m.price),density:number(m.density)||guessDensity(m.name)})),
     items:d.items.map(normItem),spools:(Array.isArray(d.spools)?d.spools:[]).map(normSpool),prints:(Array.isArray(d.prints)?d.prints:[]).map(normPrint)};
   for(const s of o.spools)libAbsorb(s,o.lib);
+  // целостность связей: печати удалённых изделий/элементов, вложенность без циклов
+  const byId=new Map(o.items.map(x=>[x.id,x]));
+  for(const p of o.prints){const it=byId.get(p.itemId);if(p.itemId&&!it){p.itemId='';p.partId=''}else if(p.partId&&!it.parts.some(x=>x.id===p.partId))p.partId=''}
+  for(const x of o.items){if(!byId.has(x.parentId)||x.parentId===x.id){x.parentId='';continue}const seen=new Set([x.id]);for(let c=byId.get(x.parentId);c;c=byId.get(c.parentId)){if(seen.has(c.id)){x.parentId='';break}seen.add(c.id)}}
   return o}
 
 /* ================= Расчёт ================= */
@@ -293,7 +297,25 @@ function saveCalc(open){const name=$('name').value.trim();if(!name){alert('Вв�
 
 /* ================= Каталог ================= */
 const printsOf=id=>db.prints.filter(p=>p.itemId===id);
+/* --- Вложенность изделий: сборка → вложенные изделия --- */
+const kidsOf=id=>db.items.filter(x=>x.parentId===id);
+const parentOf=it=>it?.parentId?db.items.find(x=>x.id===it.parentId)||null:null;
+function isDescendant(id,ofId){const seen=new Set();for(let c=db.items.find(x=>x.id===id);c&&!seen.has(c.id);c=parentOf(c)){if(c.id===ofId)return true;seen.add(c.id)}return false}
+const canNest=(childId,parentId)=>!!parentId&&childId!==parentId&&!isDescendant(parentId,childId);
+function itemPath(it){const r=[],seen=new Set();for(let c=parentOf(it);c&&!seen.has(c.id);c=parentOf(c)){seen.add(c.id);r.unshift(c)}return r}
+function descendants(it){const r=[],q=[it.id],seen=new Set([it.id]);while(q.length){for(const k of kidsOf(q.shift()))if(!seen.has(k.id)){seen.add(k.id);r.push(k);q.push(k.id)}}return r}
+function calcTree(it){const c=calcItem(it),d=descendants(it),r={total:c.total,grams:c.grams,hours:c.hours,n:d.length};for(const x of d){const k=calcItem(x);r.total+=k.total;r.grams+=k.grams;r.hours+=k.hours}return r}
+function nestItem(childId,parentId){const ch=db.items.find(x=>x.id===childId);if(!ch)return false;const pa=parentId?db.items.find(x=>x.id===parentId):null;
+  if(parentId&&(!pa||!canNest(childId,parentId))){setStatus('Нельзя вложить изделие само в себя или в своё вложенное');return false}
+  if((ch.parentId||'')===(parentId||''))return false;ch.parentId=pa?pa.id:'';touch(ch);persist();renderList();if(currentPage==='item')renderItem();
+  setStatus(pa?`«${ch.name}» вложено в «${pa.name}»`:`«${ch.name}» вынесено на верхний уровень`);return true}
+const nestOptions=it=>`<option value="">— верхний уровень (самостоятельное изделие) —</option>`+db.items.filter(x=>canNest(it.id,x.id)).sort((a,b)=>a.name.localeCompare(b.name,'ru')).map(x=>`<option value="${escape(x.id)}"${x.id===it.parentId?' selected':''}>${escape(itemPath(x).map(y=>y.name).concat(x.name).join(' › '))}</option>`).join('');
+// Удаление изделия: записи журнала остаются (время фиксируется, ссылка снимается), вложенные поднимаются на уровень выше
+function removeItem(it){for(const p of db.prints)if(p.itemId===it.id){if(p.hours==null)p.hours=printHours(p);p.itemId='';p.partId=''}
+  for(const k of kidsOf(it.id))k.parentId=it.parentId&&it.parentId!==it.id?it.parentId:'';
+  db.items=db.items.filter(x=>x!==it)}
 const coverImg=x=>x.cover?`<img data-photo="${escape(x.cover)}" alt="">`:x.coverUrl?`<img src="${escape(x.coverUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'◈';
+const catFlat=()=>!!($('search').value.trim()||$('statusFilter').value||$('matFilter').value);
 function filtered(){const q=$('search').value.trim().toLowerCase(),st=$('statusFilter').value,mf=$('matFilter').value,so=$('catSort').value;
   const list=db.items.filter(x=>(!st||x.status===st)&&(!mf||itemMaterials(x).includes(mf))&&(x.name+' '+x.tags.join(' ')+' '+itemMaterials(x).map(m=>getMat(m).name).join(' ')+' '+x.notes).toLowerCase().includes(q));
   const cost=new Map(list.map(x=>[x.id,calcItem(x).total])),cnt=x=>itemDone(x).sets;
@@ -301,16 +323,32 @@ function filtered(){const q=$('search').value.trim().toLowerCase(),st=$('statusF
   return cmp?list.sort(cmp):list}
 let catView=lsGet('p2s_cat_view','cards');
 const matDots=mids=>`<span class="matdots">${mids.map(m=>`<span class="pill">${escape(getMat(m).name)}</span>`).join('')}</span>`;
-function renderCards(list){$('catCards').innerHTML=list.map(x=>{const c=calcItem(x),n=itemDone(x).sets;return`<article class="icard" tabindex="0" data-open="${escape(x.id)}"><div class="cover">${coverImg(x)}</div><div class="body"><div class="ttl">${escape(x.name)}</div><div class="meta"><span class="pill ${x.status}">${STATUSES[x.status]}</span>${matDots(itemMaterials(x))}</div><div class="meta"><span class="cost">${money(c.total)}</span><span>· ${fmt(c.grams)} г · ${fmtH(c.hours)}</span></div>${n?`<div class="meta">напечатано: ${n}</div>`:''}</div><div class="acts"><button type="button" data-cact="print" title="Записать печать">✓ Печать</button><button type="button" class="secondary" data-cact="dup" title="Дублировать">⧉</button></div></article>`}).join('');hydrate($('catCards'))}
+const topLevel=list=>catFlat()?list:list.filter(x=>!parentOf(x));
+const pathHtml=x=>{const p=itemPath(x);return p.length?`<div class="ipath">в «${escape(p.map(y=>y.name).join(' › '))}»</div>`:''};
+function kidsHtml(x,order){const ks=order.filter(k=>k.parentId===x.id);if(!ks.length)return'';return`<div class="ikids"><span class="muted">Вложено (${descendants(x).length}):</span>${ks.slice(0,6).map(k=>`<a href="#item/${escape(k.id)}" class="kchip" draggable="true" data-drag="${escape(k.id)}">${escape(k.name)}${kidsOf(k.id).length?' ▸':''}</a>`).join('')}${ks.length>6?`<span class="muted">+${ks.length-6}</span>`:''}</div>`}
+function renderCards(list){const flat=catFlat();$('catCards').innerHTML=topLevel(list).map(x=>{const c=calcItem(x),n=itemDone(x).sets,t=calcTree(x);return`<article class="icard" tabindex="0" draggable="true" data-drag="${escape(x.id)}" data-open="${escape(x.id)}"><div class="cover">${coverImg(x)}</div><div class="body">${flat?pathHtml(x):''}<div class="ttl">${escape(x.name)}</div><div class="meta"><span class="pill ${x.status}">${STATUSES[x.status]}</span>${matDots(itemMaterials(x))}</div><div class="meta"><span class="cost">${money(c.total)}</span><span>· ${fmt(c.grams)} г · ${fmtH(c.hours)}</span></div>${t.n?`<div class="meta">сборка целиком: <b>${money(t.total)}</b></div>`:''}${n?`<div class="meta">напечатано: ${n}</div>`:''}${flat?'':kidsHtml(x,list)}</div><div class="acts"><button type="button" data-cact="print" title="Записать печать">✓ Печать</button><button type="button" class="secondary" data-cact="dup" title="Дублировать">⧉</button></div></article>`}).join('');hydrate($('catCards'))}
 
 function renderRows(list){
   $('empty').hidden=list.length>0;$('empty').textContent=db.items.length?'Ничего не найдено.':'Пока нет сохранённых изделий.';
-  $('rows').innerHTML=list.map(x=>{const c=calcItem(x),n=x.parts.length;return`<tr class="click" data-open="${escape(x.id)}"><td><div class="thumb">${coverImg(x)}</div></td><td><b>${escape(x.name)}</b><div><small>${n>1?n+' элемент'+(n<5?'а':'ов'):''}${n>1&&x.tags.length?' · ':''}${escape(x.tags.join(', '))}</small></div></td><td><span class="pill ${x.status}">${STATUSES[x.status]}</span></td><td>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}</td><td class="num">${fmt(c.grams)} г</td><td class="num">${fmtH(c.hours)}</td><td class="num"><b>${money(c.total)}</b>${c.proto.count?`<div><small>+ ${money(c.proto.total)} прототипы</small></div>`:''}</td><td>${escape((x.createdAt||'').slice(0,10))}</td></tr>`}).join('');
+  const flat=catFlat(),out=[];if(flat)for(const x of list)out.push([x,0]);else{const seen=new Set(),walk=(x,d)=>{if(seen.has(x.id))return;seen.add(x.id);out.push([x,d]);for(const k of list.filter(k=>k.parentId===x.id))walk(k,d+1)};for(const x of topLevel(list))walk(x,0);for(const x of list)if(!seen.has(x.id))walk(x,0)}
+  $('rows').innerHTML=out.map(([x,d])=>{const c=calcItem(x),n=x.parts.length,t=calcTree(x);return`<tr class="click${d?' child':''}" draggable="true" data-drag="${escape(x.id)}" data-open="${escape(x.id)}"><td><div class="thumb"${d?` style="margin-left:${Math.min(d,4)*18}px"`:''}>${coverImg(x)}</div></td><td>${d?'<span class="muted">└ </span>':''}<b>${escape(x.name)}</b>${flat?pathHtml(x):''}<div><small>${t.n?`сборка: ${t.n} влож. · ${money(t.total)}${n>1||x.tags.length?' · ':''}`:''}${n>1?n+' элемент'+(n<5?'а':'ов'):''}${n>1&&x.tags.length?' · ':''}${escape(x.tags.join(', '))}</small></div></td><td><span class="pill ${x.status}">${STATUSES[x.status]}</span></td><td>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))}</td><td class="num">${fmt(c.grams)} г</td><td class="num">${fmtH(c.hours)}</td><td class="num"><b>${money(c.total)}</b>${c.proto.count?`<div><small>+ ${money(c.proto.total)} прототипы</small></div>`:''}</td><td>${escape((x.createdAt||'').slice(0,10))}</td></tr>`}).join('');
   hydrate($('rows'))}
 function renderList(){const fl=filtered();renderRows(fl);renderCards(fl);$('catCards').hidden=catView!=='cards'||!fl.length;$('catTable').hidden=catView!=='table'||!fl.length;$('catSub').textContent=db.items.length?`Всего: ${db.items.length}${fl.length!==db.items.length?` · показано: ${fl.length}`:''}`:'Каталог ваших моделей';if(currentPage==='home')renderDash();renderStats();renderSpools();renderLog();$('navCount').textContent=db.items.length||''}
 
 /* ================= Статистика ================= */
-function renderStats(){renderStatPrinters();
+function renderStatBrands(){const f=$('statMat').value,G=new Map(),ok=s=>!f||s.materialId===f;
+  for(const s of db.spools){if(!ok(s))continue;const k=(s.brand.trim()||'Без производителя')+'|'+s.materialId;let g=G.get(k);if(!g)G.set(k,g={brand:s.brand.trim()||'Без производителя',mid:s.materialId,n:0,rated:0,sum:0,tags:new Map(),prints:new Set(),fails:new Set(),grams:0,kg:[],ids:new Set()});
+    g.n++;g.ids.add(s.id);if(s.rating){g.rated++;g.sum+=s.rating}for(const t of s.rtags)g.tags.set(t,(g.tags.get(t)||0)+1);if(s.price&&number(s.net))g.kg.push(s.price/number(s.net)*1000)}
+  const sp=new Map(db.spools.map(s=>[s.id,s]));
+  for(const p of db.prints)for(const u of p.usage){const s=sp.get(u.spoolId);if(!s||!ok(s))continue;const g=G.get((s.brand.trim()||'Без производителя')+'|'+s.materialId);g.prints.add(p.id);g.grams+=number(u.grams);if(p.result==='fail')g.fails.add(p.id)}
+  const rows=[...G.values()].filter(g=>g.rated||g.prints.size||g.tags.size);
+  const best=new Map();for(const g of rows){if(!g.rated)continue;const a=g.sum/g.rated,b=best.get(g.mid);if(!b||a>b.a)best.set(g.mid,{a,g})}
+  const multi=new Set();{const c=new Map();for(const g of rows)if(g.rated)c.set(g.mid,(c.get(g.mid)||0)+1);for(const [m,n] of c)if(n>1)multi.add(m)}
+  rows.sort((a,b)=>getMat(a.mid).name.localeCompare(getMat(b.mid).name,'ru')||(b.rated?b.sum/b.rated:-1)-(a.rated?a.sum/a.rated:-1)||b.prints.size-a.prints.size);
+  $('statBrandsEmpty').hidden=rows.length>0;$('statBrandsWrap').hidden=!rows.length;
+  $('statBrands').innerHTML=rows.map(g=>{const a=g.rated?g.sum/g.rated:0,fr=g.prints.size?g.fails.size/g.prints.size*100:null,top=[...g.tags.entries()].sort((x,y)=>y[1]-x[1]).slice(0,4),isBest=multi.has(g.mid)&&best.get(g.mid)?.g===g,kg=g.kg.length?g.kg.reduce((x,y)=>x+y,0)/g.kg.length:0;
+    return`<tr><td><b>${escape(g.brand)}</b>${isBest?' <span class="pill done" title="Лучшая средняя оценка среди производителей этого материала">лучший</span>':''}</td><td>${escape(getMat(g.mid).name)}</td><td class="num">${g.rated}/${g.n}</td><td style="white-space:nowrap">${a?`<span class="stars" title="${fmt(a,1)} из 5">${starsTxt(a)}</span> <small>${fmt(a,1)}</small>`:'<span class="muted">—</span>'}</td><td class="num">${g.prints.size||'—'}</td><td class="num"${fr!=null&&fr>=20?' style="color:var(--neg)"':''}>${fr==null?'—':fmt(fr,0)+'%'}</td><td class="num">${kg?money(kg):'—'}</td><td>${top.map(([t,n])=>`<span class="rtag sm ${RTAGS[t][0]==='+'?'pos':'neg'}">${escape(RTAGS[t][1])}${n>1?' ×'+n:''}</span>`).join(' ')||'<span class="muted">—</span>'}</td></tr>`}).join('')}
+function renderStats(){renderStatPrinters();renderStatBrands();
   const f=$('statMat').value,list=f?db.items.filter(x=>itemMaterials(x).includes(f)):db.items;
   $('statsScope').textContent=f?`Изделия с материалом ${getMat(f).name}: ${list.length} из ${db.items.length}`:`Все изделия каталога: ${db.items.length}`;
   $('statsEmpty').hidden=list.length>0;$('statsBody').hidden=!list.length;if(!list.length)return;
@@ -336,10 +374,14 @@ const item=()=>db.items.find(i=>i.id===currentItemId);
 const touch=it=>{it.updatedAt=now()};
 function renderItem(){const it=item();if(!it)return;$('itCover').innerHTML=coverImg(it);hydrate($('itCover'));$('itTabLogN').textContent=printsOf(it.id).length||'';
   $('itTitle').textContent=it.name||'Без названия';
+  {const path=itemPath(it);$('itPath').innerHTML=path.length?'В составе: '+path.map(x=>`<a class="lnk" href="#item/${escape(x.id)}">${escape(x.name)}</a>`).join(' › '):'';$('itPath').hidden=!path.length}
   $('itMeta').innerHTML=`<span class="pill ${it.status}">${STATUSES[it.status]}</span> · создано ${escape((it.createdAt||'').slice(0,10))}${it.updatedAt?' · изменено '+escape(new Date(it.updatedAt).toLocaleString('ru-RU')):''}`;
   $('itPrinter').innerHTML=printerOptions(it.printerId);
   $('page-item').querySelectorAll('[data-f]').forEach(el=>{const v=getPath(it,el.dataset.f);el.value=el.dataset.f==='tags'?it.tags.join(', '):(v??'')});
-  renderLinks();renderParts();renderItemPrints();if(printFormFor===it.id&&!$('printForm').hidden)buildPfRows(true);else closePrintForm();renderProtos();renderItemCalc();renderPhotos();renderDesc()}
+  renderNest();renderLinks();renderParts();renderItemPrints();if(printFormFor===it.id&&!$('printForm').hidden)buildPfRows(true);else closePrintForm();renderProtos();renderItemCalc();renderPhotos();renderDesc()}
+function renderNest(){const it=item();if(!it)return;$('itParent').innerHTML=nestOptions(it);const ks=kidsOf(it.id),cand=db.items.filter(x=>x.id!==it.id&&x.parentId!==it.id&&canNest(x.id,it.id)).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  $('itKids').innerHTML=ks.length?ks.map(k=>{const c=calcTree(k);return`<div class="kid"><a class="thumb" href="#item/${escape(k.id)}">${coverImg(k)}</a><div><a class="lnk" href="#item/${escape(k.id)}"><b>${escape(k.name)}</b></a><br><small class="muted">${money(c.total)} · ${fmt(c.grams)} г · ${fmtH(c.hours)}${c.n?` · вложено: ${c.n}`:''}</small></div><button type="button" class="iconbtn" data-act="unnest" data-kid="${escape(k.id)}" title="Вынести из сборки">⇱</button></div>`}).join(''):'<p class="muted" style="margin:0">Вложенных изделий нет. Например, корпус — основное изделие, а внутренние детали, загруженные из облака отдельными изделиями, можно вложить сюда.</p>';
+  $('itKidAdd').innerHTML='<option value="">+ Вложить изделие…</option>'+cand.map(x=>`<option value="${escape(x.id)}">${escape(x.name)}${x.parentId?` (сейчас в «${escape(parentOf(x)?.name||'')}»)`:''}</option>`).join('');$('itKidAdd').disabled=!cand.length;hydrate($('itKids'))}
 function renderLinks(){const it=item();$('itLinks').innerHTML=it.links.length?it.links.map((l,i)=>{const u=safeUrl(l.url);return`<div class="linkrow"><input class="ltitle" data-li="${i}" data-lf="title" value="${escape(l.title)}" placeholder="Название (MakerWorld, Printables...)"><input data-li="${i}" data-lf="url" value="${escape(l.url)}" placeholder="https://makerworld.com/... или thingiverse.com/..."><a ${u?`href="${escape(u)}"`:''} target="_blank" rel="noopener" title="Открыть" data-lopen="${i}" style="${u?'':'opacity:.3'}">↗</a><button class="iconbtn danger" data-act="delLink" data-li="${i}" title="Удалить">×</button></div>`}).join(''):'<p class="muted" style="margin-top:0">Ссылок пока нет.</p>'}
 function renderParts(){const it=item();
   $('itParts').innerHTML=it.parts.map(p=>`<div class="part" data-pid="${escape(p.id)}"><div class="partrow"><label class="pname">Элемент<input data-pid="${escape(p.id)}" data-pf="name" value="${escape(p.name)}" placeholder="Основание, крышка..."></label><label>Кол-во<input data-pid="${escape(p.id)}" data-pf="qty" type="number" min="1" step="1" value="${p.qty}"></label><div class="lbl ptime">Время на 1 шт${tin(`data-pid="${escape(p.id)}" data-pf="hours"`,p.hours)}</div><div class="pcost" data-pcost="${escape(p.id)}"></div><div style="display:flex;gap:6px;padding-bottom:2px"><button class="iconbtn" data-act="dupPart" data-pid="${escape(p.id)}" title="Дублировать элемент">⧉</button><button class="iconbtn danger" data-act="delPart" data-pid="${escape(p.id)}" title="Удалить элемент">×</button></div></div>
@@ -349,6 +391,7 @@ function renderProtos(){const it=item();$('itProtos').innerHTML=it.prototypes.le
 function renderItemCalc(){const it=item();if(!it)return;const c=calcItem(it);
   $('itTotal').textContent=money(c.total);
   $('itSummary').textContent=`${fmt(c.grams)} г · ${fmtH(c.hours)} · элементов: ${it.parts.length}${c.pieces!==it.parts.length?` (${c.pieces} шт)`:''}${c.grams?` · ${money(c.total/c.grams)}/г`:''}`;
+  {const t=calcTree(it);$('itTreeCost').innerHTML=t.n?`<div class="line"><span>Вложенные изделия · ${t.n} шт</span><b>${money(t.total-c.total)}</b></div><div class="line"><span><b>Сборка целиком</b> · ${fmt(t.grams)} г · ${fmtH(t.hours)}</span><b>${money(t.total)}</b></div>`:''}
   $('itBreakdown').innerHTML=breakdownHtml(c);$('itBars').innerHTML=barsHtml(c);
   $('itMats').innerHTML=Object.entries(c.byMat).map(([m,v])=>`<div class="line"><span>${escape(getMat(m).name)} · ${fmt(v.grams)} г</span><b>${money(v.cost)}</b></div>`).join('')||'<p class="muted">—</p>';
   $('itProtoCost').innerHTML=c.proto.count?`<div class="line"><span>Прототипы · ${c.proto.count} шт</span><b>${money(c.proto.total)}</b></div><div class="line"><span><b>Итого с прототипами</b></span><b>${money(c.dev)}</b></div>`:'';
@@ -393,13 +436,14 @@ $('page-item').addEventListener('click',async e=>{const b=e.target.closest('[dat
   else if(act==='delProto'){it.prototypes=it.prototypes.filter(x=>x.id!==b.dataset.pr);renderProtos()}
   else if(act==='addPart'){const last=it.parts.at(-1);it.parts.push({id:shortId(),name:'',qty:1,hours:0,filaments:[{materialId:last?.filaments[0]?.materialId||db.materials[0]?.id||'',grams:0}]});renderParts();$('itParts').querySelector('.part:last-child [data-pf="name"]')?.focus()}
   else if(act==='dupPart'&&p){const cp=structuredClone(p);cp.id=shortId();cp.name=(p.name||'Элемент')+' (копия)';it.parts.splice(it.parts.indexOf(p)+1,0,cp);renderParts()}
-  else if(act==='delPart'&&p){if(it.parts.length===1&&!confirm('Это единственный элемент. Удалить?'))return;it.parts=it.parts.filter(x=>x!==p);renderParts()}
+  else if(act==='delPart'&&p){const pp=db.prints.filter(x=>x.itemId===it.id&&x.partId===p.id);if(pp.length?!confirm(`Элемент «${p.name||'без названия'}» привязан к записям журнала (${pp.length}). Записи останутся у изделия без элемента. Удалить?`):it.parts.length===1&&!confirm('Это единственный элемент. Удалить?'))return;for(const x of pp){if(x.hours==null)x.hours=printHours(x);x.partId=''}it.parts=it.parts.filter(x=>x!==p);renderParts();renderItemPrints()}
   else if(act==='addFil'&&p){p.filaments.push({materialId:db.materials.find(m=>!p.filaments.some(f=>f.materialId===m.id))?.id||db.materials[0]?.id||'',grams:0});renderParts()}
   else if(act==='delFil'&&p){p.filaments.splice(+b.dataset.fi,1);renderParts()}
   else if(act==='cover'){const ph=it.photos.find(x=>x.id===b.dataset.ph);if(ph)it.cover=ph.file;renderPhotos()}
   else if(act==='delPhoto'){const ph=it.photos.find(x=>x.id===b.dataset.ph);if(!ph||!confirm('Удалить фото? Файл будет удалён из папки photos/.'))return;it.photos=it.photos.filter(x=>x!==ph);if(it.cover===ph.file)it.cover=it.photos[0]?.file||'';await removePhotoFiles([ph.file]);renderPhotos()}
   else if(act==='dupItem'){go('item/'+duplicateItem(it).id);return}
-  else if(act==='delItem'){if(!confirm(`Удалить изделие «${it.name}»?${it.photos.length?' Его фото тоже будут удалены из папки.':''}`))return;await removePhotoFiles(it.photos.map(x=>x.file));db.items=db.items.filter(x=>x!==it);persist();renderList();setStatus('Изделие удалено');go('catalog');return}
+  else if(act==='unnest'){nestItem(b.dataset.kid,'');return}
+  else if(act==='delItem'){const np=printsOf(it.id).length,nk=kidsOf(it.id).length;if(!confirm(`Удалить изделие «${it.name}»?${np?`\n\nЗаписи журнала печати (${np}) останутся с прежним названием, временем и расходом, но без привязки к изделию.`:''}${nk?`\n\nВложенные изделия (${nk}) не удалятся — перейдут ${parentOf(it)?`в «${parentOf(it).name}»`:'на верхний уровень'}.`:''}${it.photos.length?'\n\nФото изделия будут удалены из папки.':''}`))return;await removePhotoFiles(it.photos.map(x=>x.file));removeItem(it);persist();renderList();setStatus(np?`Изделие удалено · записей журнала без изделия: ${np}`:'Изделие удалено');go('catalog');return}
   else return;
   touch(it);persist();renderList();renderItemCalc();renderDesc();if(/Part|Fil/.test(act))refreshPrintForm()});
 $('photoAdd').onclick=()=>$('photoInput').click();
@@ -411,13 +455,17 @@ $('descCopy').onclick=async()=>{const text=$('descOut').textContent;try{await na
 
 /* ================= Катушки ================= */
 const SPOOL_ST={sealed:'Запечатана',open:'Открыта',empty:'Закончилась'};
+// Отзыв о катушке: плюсы (+) и проблемы (−)
+const RTAGS={easy:['+','Печатается без проблем'],surface:['+','Красивая поверхность'],strong:['+','Прочный'],colorok:['+','Цвет как на фото'],dia:['+','Ровный диаметр'],
+  string:['−','Сопли / стрингинг'],wet:['−','Сырой, нужна сушка'],warp:['−','Коробится / отлипает'],layers:['−','Слабое спекание слоёв'],clog:['−','Засоры / пробуксовка'],tangle:['−','Плохая намотка'],brittle:['−','Хрупкий'],diambad:['−','Скачет диаметр'],colorbad:['−','Цвет не совпадает']};
+const starsTxt=r=>r?'★'.repeat(Math.round(r))+'☆'.repeat(5-Math.round(r)):'';
 const OPNAMES={set:'Установлен остаток',sub:'Списание',add:'Добавление'};
 const DENS={PETG:1.27,PCTG:1.23,ASA:1.07,ABS:1.04,TPU:1.21,PLA:1.24,PVA:1.23,HIPS:1.04,PA:1.14,PC:1.2};
 function guessDensity(name){const n=String(name).toUpperCase();for(const k of Object.keys(DENS))if(n.includes(k))return DENS[k];return 1.24}
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 function normSpool(s){return{id:String(s.id||uid()),materialId:String(s.materialId||''),brand:String(s.brand||''),series:String(s.series||''),color:String(s.color||''),colorHex:/^#[0-9a-f]{6}$/i.test(s.colorHex)?s.colorHex:'#d9dee8',colorStops:(Array.isArray(s.colorStops)?s.colorStops:[]).filter(v=>/^#[0-9a-f]{6}$/i.test(v)).slice(0,8),
   diameter:number(s.diameter)||1.75,net:number(s.net)||1000,empty:s.empty===''||s.empty==null?'':number(s.empty),price:number(s.price),purchased:String(s.purchased||''),store:String(s.store||''),
-  status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),bambu:String(s.bambu||''),createdAt:s.createdAt||now(),
+  status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),bambu:String(s.bambu||''),createdAt:s.createdAt||now(),rating:Math.max(0,Math.min(5,Math.round(number(s.rating)))),rtags:(Array.isArray(s.rtags)?s.rtags:[]).filter(t=>RTAGS[t]),review:String(s.review||''),
   ops:(Array.isArray(s.ops)?s.ops:[]).filter(o=>OPNAMES[o?.type]).map(o=>({id:String(o.id||shortId()),at:o.at||now(),date:String(o.date||String(o.at||now()).slice(0,10)),type:o.type,grams:number(o.grams),note:String(o.note||'')}))}}
 function normPrint(p){return{id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),itemId:String(p.itemId||''),itemName:String(p.itemName||''),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),sets:Math.max(1,Math.round(number(p.sets))||1),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),src:String(p.src||''),partId:String(p.partId||''),plate:String(p.plate||''),cover:/^https:\/\//.test(p.cover||'')?String(p.cover):'',
   usage:(Array.isArray(p.usage)?p.usage:[]).map(u=>({label:String(u.label||''),materialId:String(u.materialId||''),spoolId:String(u.spoolId||''),grams:number(u.grams)}))}}
@@ -455,8 +503,8 @@ function renderSpools(){
   const sortBy=$('spoolSort').value,grp=$('spoolGroup').value,dkey=s=>s.purchased||s.createdAt.slice(0,10);
   const cmp={remAsc:(a,b)=>a.st.remaining-b.st.remaining,remDesc:(a,b)=>b.st.remaining-a.st.remaining,dateDesc:(a,b)=>dkey(b.s).localeCompare(dkey(a.s)),dateAsc:(a,b)=>dkey(a.s).localeCompare(dkey(b.s)),name:(a,b)=>spName(a.s).localeCompare(spName(b.s),'ru')}[sortBy]||(()=>0);
   list.sort(cmp);
-  const row=({s,st})=>{const g=st.remaining,isLow=s.status!=='empty'&&g<low;return`<tr class="click" data-spool="${escape(s.id)}"><td>${swatch(s)}</td><td><b>${escape(s.brand||'—')}</b>${s.store?`<div><small>${escape(s.store)}</small></div>`:''}</td><td>${escape([s.series,s.color].filter(x=>String(x).trim()).join(' · ')||'—')}</td><td>${escape(getMat(s.materialId).name)}</td><td><span style="${isLow?'color:var(--neg)':''}">${fmt(g,0)} г · ${fmt(toM(s,g),0)} м${isLow?' · мало':''}</span>${remBar(s,g)}</td><td class="num">${s.price?money(s.price)+`<div><small>${money(s.price/number(s.net)*1000)}/кг</small></div>`:'—'}</td><td>${escape(s.purchased)}</td><td><span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span></td></tr>`};
-  const card=({s,st})=>{const g=st.remaining,isLow=s.status!=='empty'&&g<low;return`<div class="scard${isLow?' low':''}${s.status==='empty'?' empty-s':''}" tabindex="0" data-spool="${escape(s.id)}">${swatch(s)}<div class="nm">${escape(s.brand||'Без производителя')}${isLow?'<span class="lowtag">мало</span>':''}</div><div class="sub">${escape(getMat(s.materialId).name)} · ${escape([s.series,s.color].filter(x=>String(x).trim()).join(' · ')||'—')}</div><div class="rem"><span><b>${fmt(Math.max(0,g),0)} г</b> <small class="muted">≈ ${fmt(toM(s,Math.max(0,g)),0)} м</small></span><span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span></div>${remBar(s,g)}</div>`};
+  const row=({s,st})=>{const g=st.remaining,isLow=s.status!=='empty'&&g<low;return`<tr class="click" data-spool="${escape(s.id)}"><td>${swatch(s)}</td><td><b>${escape(s.brand||'—')}</b>${s.rating?` <span class="stars sm" title="Оценка ${s.rating} из 5">${starsTxt(s.rating)}</span>`:''}${s.store?`<div><small>${escape(s.store)}</small></div>`:''}</td><td>${escape([s.series,s.color].filter(x=>String(x).trim()).join(' · ')||'—')}</td><td>${escape(getMat(s.materialId).name)}</td><td><span style="${isLow?'color:var(--neg)':''}">${fmt(g,0)} г · ${fmt(toM(s,g),0)} м${isLow?' · мало':''}</span>${remBar(s,g)}</td><td class="num">${s.price?money(s.price)+`<div><small>${money(s.price/number(s.net)*1000)}/кг</small></div>`:'—'}</td><td>${escape(s.purchased)}</td><td><span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span></td></tr>`};
+  const card=({s,st})=>{const g=st.remaining,isLow=s.status!=='empty'&&g<low;return`<div class="scard${isLow?' low':''}${s.status==='empty'?' empty-s':''}" tabindex="0" data-spool="${escape(s.id)}">${swatch(s)}<div class="nm">${escape(s.brand||'Без производителя')}${s.rating?`<span class="stars sm" title="Оценка ${s.rating} из 5">${starsTxt(s.rating)}</span>`:''}${isLow?'<span class="lowtag">мало</span>':''}</div><div class="sub">${escape(getMat(s.materialId).name)} · ${escape([s.series,s.color].filter(x=>String(x).trim()).join(' · ')||'—')}</div><div class="rem"><span><b>${fmt(Math.max(0,g),0)} г</b> <small class="muted">≈ ${fmt(toM(s,Math.max(0,g)),0)} м</small></span><span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span></div>${remBar(s,g)}</div>`};
   if(cards){if(grp!=='material')$('spoolCards').innerHTML=`<div class="spcards">${list.map(card).join('')}</div>`;else{const groups=new Map();for(const x of list){const k=x.s.materialId;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x)}
     $('spoolCards').innerHTML=[...groups.entries()].sort((a,b)=>getMat(a[0]).name.localeCompare(getMat(b[0]).name,'ru')).map(([k,xs])=>{const g=xs.reduce((a,x)=>a+Math.max(0,x.st.remaining),0);return`<h3 class="spgroup">${escape(getMat(k).name)} <small>· ${xs.length} кат. · ${fmt(g,0)} г</small></h3><div class="spcards">${xs.map(card).join('')}</div>`}).join('')}}
   if(grp!=='material'){$('spoolRows').innerHTML=list.map(row).join('')}
@@ -470,7 +518,7 @@ function renderSpools(){
 let currentSpoolId=null;const spool=()=>getSpool(currentSpoolId);
 function renderSpool(){const s=spool();if(!s)return;if(renderSpool.last!==s.id){renderSpool.last=s.id;for(const k of ['corrVal','corrNote','weighGross'])$(k).value=''}
   $('spMat').innerHTML=matOptions(s.materialId);$('spBrand').innerHTML=brandOptions(s.brand);$('spStatus').innerHTML=Object.entries(SPOOL_ST).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
-  renderColorEdit();$('page-spool').querySelectorAll('[data-sf]').forEach(el=>{el.value=s[el.dataset.sf]??''});renderColorChips();renderQuick();
+  renderColorEdit();$('page-spool').querySelectorAll('[data-sf]').forEach(el=>{el.value=s[el.dataset.sf]??''});renderColorChips();renderQuick();renderRating();
   renderSpoolHead();renderSpoolRem()}
 function renderSpoolHead(){const s=spool();$('spTitle').textContent=spName(s);$('spSwatch').style.background=bgOf(s);$('spMeta').innerHTML=`${escape(getMat(s.materialId).name)} · ${fmt(s.diameter,2)} мм · <span class="pill sp-${s.status}">${SPOOL_ST[s.status]}</span>`}
 function renderSpoolRem(){const s=spool();if(!s)return;const st=spoolState(s),g=st.remaining,k=gPerM(s);
@@ -484,6 +532,11 @@ function renderSpoolRem(){const s=spool();if(!s)return;const st=spoolState(s),g=
   $('weighHint').innerHTML=hint;$('weighNew').hidden=s.empty!=='';
   updateCorrHint();
   $('spHist').innerHTML=st.events.slice().reverse().map(e=>`<tr><td>${escape(e.date||'')}</td><td>${e.item?`<a href="#item/${escape(e.item)}" class="lnk">${escape(e.label)}</a>`:escape(e.label)}</td><td class="num" style="color:${e.delta<0?'var(--neg)':'var(--pos)'}">${e.delta>0?'+':''}${fmt(e.delta,1)} г<div><small>${e.delta>0?'+':''}${fmt(toM(s,e.delta),1)} м</small></div></td><td class="num">${fmt(e.after,0)} г</td><td>${e.op?`<button class="iconbtn danger" data-delop="${escape(e.op)}" title="Отменить корректировку">×</button>`:''}</td></tr>`).join('')+`<tr><td>${escape(s.purchased||s.createdAt.slice(0,10))}</td><td>Новая катушка</td><td class="num">+${fmt(s.net,0)} г</td><td class="num">${fmt(s.net,0)} г</td><td></td></tr>`}
+function renderRating(){const s=spool();if(!s)return;
+  $('spStars').innerHTML=[1,2,3,4,5].map(n=>`<button type="button" class="star${n<=s.rating?' on':''}" data-rate="${n}" title="${['','Плохо','Слабо','Нормально','Хорошо','Отлично'][n]}" aria-label="${n} из 5">★</button>`).join('')+`<span class="muted">${s.rating?['','Плохо','Слабо','Нормально','Хорошо','Отлично'][s.rating]:'не оценена'}</span>`;
+  $('spRtags').innerHTML=Object.entries(RTAGS).map(([k,[sg,n]])=>`<button type="button" class="rtag ${sg==='+'?'pos':'neg'}${s.rtags.includes(k)?' on':''}" data-rtag="${k}">${sg} ${escape(n)}</button>`).join('');
+  const ps=db.prints.filter(p=>p.usage.some(u=>u.spoolId===s.id)),f=ps.filter(p=>p.result==='fail').length;
+  $('spRateStat').textContent=ps.length?`По журналу: печатей с этой катушкой ${ps.length}, неудачных ${f} (${fmt(f/ps.length*100,0)}%).`:'Печатей с этой катушкой в журнале пока нет.'}
 function updateCorrHint(){const s=spool();if(!s)return;const v=number($('corrVal').value),u=$('corrUnit').value;$('corrHint').textContent=v?(u==='m'?`${fmt(v,1)} м ≈ ${fmt(v*gPerM(s),1)} г`:`${fmt(v,1)} г ≈ ${fmt(toM(s,v),1)} м`):''}
 function addOp(s,type,grams,note){s.ops.push({id:shortId(),at:now(),date:today(),type,grams:Math.max(0,grams),note});if(s.status==='sealed'&&type!=='add')s.status='open';const r=spoolState(s).remaining;if(r<=0&&s.status!=='empty'&&confirm('Остаток 0 — отметить катушку как закончившуюся?'))s.status='empty';persist();renderSpool();renderSpools()}
 function newSpool(from,tpl){const s=normSpool(from?{...structuredClone(from),id:'',bambu:'',ops:[],createdAt:'',status:'sealed',opened:'',dried:''}:{materialId:tpl?.materialId||db.materials[0]?.id,diameter:tpl?.diameter,net:tpl?.net,purchased:today()});db.spools.unshift(s);persist();renderSpools();go('spool/'+s.id)}
@@ -497,7 +550,9 @@ $('spColorEdit').addEventListener('click',e=>{const b=e.target.closest('button')
   else if(b.dataset.stopdel!==undefined){const st=spStops(s).slice();st.splice(+b.dataset.stopdel,1);setSpoolColor(s,s.color,st);afterColor(true)}
   else if(b.id==='spColorSave'){const n=s.color.trim();if(!n){alert('Введите название цвета');$('spColorEdit').querySelector('[data-sf="color"]').focus();return}const st=spStops(s).slice(),ex=db.lib.colors.find(c=>ieq(c.name,n));
     if(ex){if(!confirm(`Цвет «${ex.name}» уже есть в палитре. Заменить его оттенки?`))return;ex.stops=st}else db.lib.colors.push({name:n,stops:st});persist();renderColorChips();renderLibs();setStatus('Цвет сохранён в палитру')}});
-$('page-spool').addEventListener('click',e=>{const b=e.target.closest('[data-qf]'),s=spool();if(!b||!s)return;const k=b.dataset.qf;s[k]=b.dataset.v;$('page-spool').querySelector(`[data-sf="${k}"]`).value=s[k];renderQuick();renderSpoolHead();schedulePersist();renderSpools()});
+$('page-spool').addEventListener('click',e=>{const s=spool();if(!s)return;const r=e.target.closest('[data-rate],[data-rtag]');
+  if(r){if(r.dataset.rate){const n=+r.dataset.rate;s.rating=s.rating===n?0:n}else{const k=r.dataset.rtag;s.rtags=s.rtags.includes(k)?s.rtags.filter(x=>x!==k):[...s.rtags,k]}renderRating();schedulePersist();renderSpools();return}
+  const b=e.target.closest('[data-qf]');if(!b)return;const k=b.dataset.qf;s[k]=b.dataset.v;$('page-spool').querySelector(`[data-sf="${k}"]`).value=s[k];renderQuick();renderSpoolHead();schedulePersist();renderSpools()});
 $('page-spool').addEventListener('change',e=>{const s=spool(),k=e.target.dataset.sf;if(!s||!['series','store','brand'].includes(k))return;libAbsorb(s,db.lib,k);renderQuick();renderLibs();schedulePersist()});
 $('spoolAdd').onclick=()=>newSpool();
 let spoolView=lsGet('p2s_spool_view2','cards');
@@ -793,11 +848,22 @@ function createBlankItem(){const it=normItem({name:'Новое изделие',s
 $('newItem').onclick=createBlankItem;
 $('search').oninput=renderList;$('statusFilter').onchange=renderList;$('statMat').onchange=renderStats;
 $('rows').onclick=e=>{const tr=e.target.closest('[data-open]');if(tr)go('item/'+tr.dataset.open)};
-function duplicateItem(it){const cp=structuredClone(it);cp.id=uid();cp.name=it.name+' (копия)';cp.photos=[];cp.cover='';cp.prototypes=[];cp.createdAt=cp.updatedAt=now();cp.parts.forEach(x=>x.id=shortId());db.items.unshift(cp);persist();renderList();setStatus('Создана копия изделия');return cp}
+function duplicateItem(it){const cp=structuredClone(it);cp.id=uid();cp.bambuKey='';cp.name=it.name+' (копия)';cp.photos=[];cp.cover='';cp.prototypes=[];cp.createdAt=cp.updatedAt=now();cp.parts.forEach(x=>x.id=shortId());db.items.unshift(cp);persist();renderList();setStatus('Создана копия изделия');return cp}
 function openItemPrint(id){pendingPrint=true;go('item/'+id+'/log')}
 $('catCards').addEventListener('click',e=>{const card=e.target.closest('[data-open]');if(!card)return;const a=e.target.closest('[data-cact]')?.dataset.cact,id=card.dataset.open;
   if(a==='print')openItemPrint(id);else if(a==='dup'){const it=db.items.find(i=>i.id===id);if(it)go('item/'+duplicateItem(it).id)}else go('item/'+id)});
 $('catCards').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.icard'))go('item/'+e.target.dataset.open)});
+// перетаскивание: карточку/строку на другую — вложить; на полосу сверху — вынести на верхний уровень
+{let dragId='';const zone=$('catRoot'),tgt=e=>e.target.closest('[data-drag]'),clr=()=>document.querySelectorAll('.drop-on,.drop-no').forEach(x=>x.classList.remove('drop-on','drop-no'));
+ for(const root of [$('catCards'),$('rows')]){
+  root.addEventListener('dragstart',e=>{const t=tgt(e);if(!t)return;e.stopPropagation();dragId=t.dataset.drag;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',dragId);t.classList.add('dragging');zone.hidden=!parentOf(db.items.find(x=>x.id===dragId))});
+  root.addEventListener('dragend',()=>{dragId='';zone.hidden=true;clr();document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'))});
+  root.addEventListener('dragover',e=>{if(!dragId)return;const t=e.target.closest('[data-open]');clr();if(!t||t.dataset.open===dragId)return;const ok=canNest(dragId,t.dataset.open);t.classList.add(ok?'drop-on':'drop-no');if(ok){e.preventDefault();e.dataTransfer.dropEffect='move'}});
+  root.addEventListener('drop',e=>{const t=e.target.closest('[data-open]');if(!dragId||!t)return;e.preventDefault();const id=dragId;clr();nestItem(id,t.dataset.open)})}
+ zone.addEventListener('dragover',e=>{if(!dragId)return;e.preventDefault();zone.classList.add('drop-on')});zone.addEventListener('dragleave',()=>zone.classList.remove('drop-on'));
+ zone.addEventListener('drop',e=>{e.preventDefault();const id=dragId;zone.hidden=true;clr();if(id)nestItem(id,'')})}
+$('itParent').onchange=e=>{const it=item();if(it)nestItem(it.id,e.target.value)};
+$('itKidAdd').onchange=e=>{const it=item(),v=e.target.value;if(it&&v)nestItem(v,it.id);e.target.value=''};
 for(const id of ['matFilter','catSort'])$(id).onchange=()=>{lsSet('p2s_cat_sort',$('catSort').value);renderList()};
 $('catSort').value=lsGet('p2s_cat_sort','new');
 segInit('catView',catView,v=>{catView=v;lsSet('p2s_cat_view',v);renderList()});
@@ -1012,7 +1078,7 @@ function renderLinkList(){const p=db.prints.find(x=>x.id===linkPid);if(!p)return
   $('linkSub').textContent=`${dayTitle(p.date)} · ${p.itemName||'без названия'}${p.plate?' · '+p.plate:''} · ${fmtH(printHours(p))} · ${fmt(printGrams(p),1)} г`;
   const q=$('linkSearch').value.trim().toLowerCase(),hint=bbNorm(p.itemName);
   const list=db.items.filter(x=>(x.name+' '+x.tags.join(' ')).toLowerCase().includes(q)).sort((a,b)=>(b.id===p.itemId)-(a.id===p.itemId)||(bbNorm(b.name)===hint)-(bbNorm(a.name)===hint)||(b.updatedAt||'').localeCompare(a.updatedAt||''));
-  $('linkList').innerHTML=list.length?list.slice(0,80).map(x=>`<button type="button" class="pick-row${x.id===p.itemId?' on':''}" data-linkto="${escape(x.id)}"><span class="thumb">${coverImg(x)}</span><span><b>${escape(x.name)}</b><br><small>${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))} · элементов: ${x.parts.length}${x.id===p.itemId?' · привязано сейчас':''}</small></span><small>${money(calcItem(x).total)}</small></button>`).join(''):`<div class="empty" style="margin:6px 0">${db.items.length?'Ничего не найдено.':'Изделий пока нет.'}</div>`;hydrate($('linkList'))}
+  $('linkList').innerHTML=list.length?list.slice(0,80).map(x=>`<button type="button" class="pick-row${x.id===p.itemId?' on':''}" data-linkto="${escape(x.id)}"><span class="thumb">${coverImg(x)}</span><span><b>${escape(x.name)}</b><br><small>${itemPath(x).length?'в «'+escape(itemPath(x).map(y=>y.name).join(' › '))+'» · ':''}${escape(itemMaterials(x).map(m=>getMat(m).name).join(' + '))} · элементов: ${x.parts.length}${x.id===p.itemId?' · привязано сейчас':''}</small></span><small>${money(calcItem(x).total)}</small></button>`).join(''):`<div class="empty" style="margin:6px 0">${db.items.length?'Ничего не найдено.':'Изделий пока нет.'}</div>`;hydrate($('linkList'))}
 function openLink(pid){const p=db.prints.find(x=>x.id===pid);if(!p)return;linkPid=pid;linkItem='';$('linkSearch').value='';renderLinkList();$('linkDlg').showModal();setTimeout(()=>$('linkSearch').focus(),30)}
 // Привязать без сохранения (общая логика для журнала, импорта и моделей из облака)
 function applyLink(p,it,partId=''){if(p.hours==null)p.hours=printHours(p); // время фиксируется, чтобы смена изделия не меняла себестоимость записи
