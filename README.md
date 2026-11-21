@@ -26,17 +26,19 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Save to the catalog in one click and continue on the item page.
 
 ### Item catalog and item page
-- Cards with photos or a table, plus search, filters (status, material) and sorting. Quick actions on cards: open, print, duplicate.
-- The item page has tabs: **Overview**, **Composition**, **Print log** and **More**. "Log a print" is the main action, and delete is in the ⋯ menu.
+- A tree table or cards with photos, plus search, filters (status, material) and sorting. The table shows top-level items and their parts with collapsible branches; assemblies show whole-assembly weight, time and cost. Search and filters switch to a flat list with each item's assembly path.
+- The item page has two tabs: **Overview** and **Print log**. "Log a print" is the main action. The ⋯ menu has Move in hierarchy, MakerWorld description, Duplicate and Delete.
 - Status (idea / in progress / done / published), tags, notes, printer, extra costs.
 - Links with one-click presets for MakerWorld, Thingiverse and Printables. Titles are detected from the URL.
-- **Parts**: quantity, print time and several filaments per part (AMS multicolor). Cost is shown per part and for the whole item.
+- **Print**: quantity, time per piece and several filaments (AMS multicolor) — one such profile per item.
+- **Parts are nested items.** An assembly part is a separate item with its own filaments, time, photos and log. “+ Part” in the Composition block creates a nested item. Any depth, no cycles.
 - **Prototypes**: version, date, filament, spool, time and a "what changed" note.
 - Print settings, photos (stored in the selected storage, resized to 1600 px) and a cover image.
-- **MakerWorld description generator** (RU/EN) built from parts and print settings.
-- **Assemblies**: nest an item inside another (housing → inner parts) by dragging a card onto another one or with “Part of item” on the item page. Any depth, no cycles. The “whole assembly” cost includes nested items.
+- **MakerWorld description generator** (RU/EN) built from the item, its parts and print settings, in a separate dialog.
+- **“⇄ Structure” mode** on the Items page moves items in the hierarchy, like Confluence's “view in hierarchy”: drag a row onto another item or use “⇄ Move” → “↳ Here”; “⇤” moves one level up. Changes apply on Save, and Cancel restores everything. From the item page: ⋯ → Move in hierarchy.
 - The item creation date can be changed on the Overview tab.
-- Deleting an item keeps its print log entries (name, time, filament usage) and only drops the link. Nested items move one level up.
+- Deleting an item keeps its print log entries (name, time, filament usage) and only drops the link. An assembly can be deleted with all nested items or alone, in which case nested items move one level up. Duplicating copies the assembly with its parts.
+- On first launch of this version, items with several parts become assemblies automatically and print records for those parts move to the nested items. A data snapshot is saved before the migration (Settings → snapshot history).
 
 ### Filament spools
 - Compact cards or a table, with filters by material, brand and availability. Spools that are running low are highlighted.
@@ -56,9 +58,9 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Each record stores the print time. Success or failure is set with one button, and ↻ repeats a print with the same spools, grams and time.
 - "Log a print" from the item page deducts filament from the chosen spools. Failed prints are recorded too.
 - Any record can be edited (✎): date, result, sets, time, printer, note and spool usage. Spool levels are recalculated automatically.
-- When a part is deleted, its records stay with the item marked "part deleted" and no longer count toward printed sets.
-- Any record can be linked to a catalog item (⛓) as a whole set or to a single part (plate), or turned into a new part or a new item using the print's grams and time. Sets are counted per part.
-- Bambu Cloud task images in the log; Items → ⇣ Models from Bambu Cloud creates items from print history: model with image, plates as parts, MakerWorld link.
+- When logging a print of an assembly you can pick “This item only” or “Whole assembly”, which counts time and filament for all nested items.
+- Any record can be linked to a catalog item (⛓): the item itself, the whole assembly or one nested part (plate), or turned into a new part or a new item using the print's grams and time. An assembly counts as printed when all its parts are done.
+- Bambu Cloud task images in the log; Items → ⇣ Models from Bambu Cloud creates items from print history: model with image, several plates become an assembly with one nested item per plate, MakerWorld link.
 - View by month, by year or as a flat list, with totals per period: prints, sets, failures, filament, cost.
 - **Import from Bambu Lab Cloud** (P2S, P1S, X1, A1): your printer's print history is pulled into the log with real print time, result and per-AMS-slot filament usage. Items and spools are matched automatically by model name, filament type and color. Works through a free Cloudflare Worker, see [docs/bambu-cloud-setup.md](docs/bambu-cloud-setup.md).
 - **Spool sync with Bambu Cloud** (Spools → ⇣ Sync with Bambu Cloud): remaining weight of Bambu Lab RFID spools as reported by the AMS is recorded as a "set remaining" entry, and missing spools are created automatically.
