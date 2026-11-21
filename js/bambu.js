@@ -28,33 +28,33 @@ window.Bambu = (() => {
 
   async function call(path, { method = 'GET', body, auth = true } = {}) {
     const base = proxy();
-    if (!base) throw err('Не задан адрес прокси (Cloudflare Worker) — см. инструкцию.', { code: 'noproxy' });
+    if (!base) throw err(_t('Не задан адрес прокси (Cloudflare Worker) — см. инструкцию.'), { code: 'noproxy' });
     const headers = { 'X-Bambu-Region': region() };
     if (body) headers['Content-Type'] = 'application/json';
     if (auth) {
       const t = state().token;
-      if (!t) throw err('Нужно войти в Bambu Lab Cloud', { code: 'auth' });
+      if (!t) throw err(_t('Нужно войти в Bambu Lab Cloud'), { code: 'auth' });
       headers.Authorization = 'Bearer ' + t;
     }
     let res;
     try { res = await fetch(base + path, { method, headers, body: body ? JSON.stringify(body) : undefined }); }
-    catch { throw err('Прокси недоступен. Проверьте адрес Worker и ALLOWED_ORIGINS.', { code: 'network' }); }
+    catch { throw err(_t('Прокси недоступен. Проверьте адрес Worker и ALLOWED_ORIGINS.'), { code: 'network' }); }
     let data = null;
     const text = await res.text();
     try { data = text ? JSON.parse(text) : null; } catch { data = null; }
     if (res.status === 401) {
       if (auth) patch({ token: null });
-      throw err(auth ? 'Токен Bambu Cloud истёк или отозван — войдите заново.' : (data?.message || 'Неверный логин или пароль'), { code: 'auth' });
+      throw err(auth ? _t('Токен Bambu Cloud истёк или отозван — войдите заново.') : (data?.message || _t('Неверный логин или пароль')), { code: 'auth' });
     }
     if (res.status === 403 && data?.error === 'origin not allowed')
-      throw err(`Worker не разрешает этот сайт (${location.origin}). Добавьте его в ALLOWED_ORIGINS.`, { code: 'origin' });
-    if (!res.ok) throw err(data?.message || data?.error || `Ошибка Bambu Cloud: HTTP ${res.status}`, { code: 'http', status: res.status });
+      throw err(`${_t("Worker не разрешает этот сайт")} (${location.origin}). ${_t("Добавьте его в ALLOWED_ORIGINS")}.`, { code: 'origin' });
+    if (!res.ok) throw err(data?.message || data?.error || `${_t("Ошибка Bambu Cloud: HTTP")} ${res.status}`, { code: 'http', status: res.status });
     return data || {};
   }
 
   function saveToken(d, account) {
     const token = d.accessToken || d.token;
-    if (!token) throw err(d.message || 'Bambu Cloud не вернул токен');
+    if (!token) throw err(d.message || _t('Bambu Cloud не вернул токен'));
     const sec = Number(d.expiresIn) || 7776000; // ~90 дней
     patch({ token, account, expires: new Date(Date.now() + sec * 1000).toISOString() });
     return { ok: true };
@@ -80,7 +80,7 @@ window.Bambu = (() => {
   /* Ручной ввод токена (если включена двухфакторная аутентификация). */
   function setToken(token, days = 90) {
     token = String(token || '').trim().replace(/^Bearer\s+/i, '');
-    if (!token) throw err('Пустой токен');
+    if (!token) throw err(_t('Пустой токен'));
     patch({ token, expires: new Date(Date.now() + days * 864e5).toISOString() });
   }
   function logout() { patch({ token: null, expires: null }); }
@@ -114,7 +114,7 @@ window.Bambu = (() => {
     })).filter(f => f.grams > 0 || f.type);
     return {
       id: String(t.id),
-      title: String(t.designTitle || t.title || 'Без названия'),
+      title: String(t.designTitle || t.title || _t('Без названия')),
       file: String(t.title || ''),
       plate: String(t.plateName || (t.plateIndex ? 'Plate ' + t.plateIndex : '')),
       cover: /^https:\/\//.test(t.cover || '') ? t.cover : '',
@@ -134,11 +134,11 @@ window.Bambu = (() => {
   /* Картинка Bambu Cloud (обложка задания) через Worker — чтобы сохранить её как фото изделия. */
   async function image(url) {
     const base = proxy();
-    if (!base) throw err('Не задан адрес прокси');
+    if (!base) throw err(_t('Не задан адрес прокси'));
     const res = await fetch(base + '/img?' + new URLSearchParams({ u: url }));
-    if (!res.ok) throw err('Не удалось загрузить картинку: HTTP ' + res.status);
+    if (!res.ok) throw err(_t('Не удалось загрузить картинку: HTTP ') + res.status);
     const blob = await res.blob();
-    if (!/^image\//.test(blob.type)) throw err('Не картинка');
+    if (!/^image\//.test(blob.type)) throw err(_t('Не картинка'));
     return blob;
   }
 

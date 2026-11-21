@@ -499,3 +499,4 @@ a.kid{color:var(--text);text-decoration:none}a.kid:hover b{color:var(--link)}
 .profrow .ptime{grid-column:1/-1;grid-row:2;min-width:0}
 .profrow input{margin-top:4px}
 .pfscope{margin-top:10px}
+.langbtn{font-size:12px;font-weight:700;letter-spacing:.3px}

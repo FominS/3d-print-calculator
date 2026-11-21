@@ -25,7 +25,7 @@ window.GDrive = (() => {
   };
   const getClientId = () => ls.get(CLIENT_KEY) || window.APP_CONFIG?.googleClientId || '';
   const setClientId = v => ls.set(CLIENT_KEY, v || null);
-  const authError = (msg = 'Нужно войти в Google') => Object.assign(new Error(msg), { name: 'NotAllowedError' });
+  const authError = (msg = _t('Нужно войти в Google')) => Object.assign(new Error(msg), { name: 'NotAllowedError' });
 
   /* ---------- Вход ---------- */
   let gisPromise = null, token = null;
@@ -36,7 +36,7 @@ window.GDrive = (() => {
       s.src = 'https://accounts.google.com/gsi/client';
       s.async = true;
       s.onload = () => resolve();
-      s.onerror = () => { gisPromise = null; reject(new Error('Не удалось загрузить вход Google — проверьте интернет')); };
+      s.onerror = () => { gisPromise = null; reject(new Error(_t('Не удалось загрузить вход Google — проверьте интернет'))); };
       document.head.append(s);
     }));
   }
@@ -50,7 +50,7 @@ window.GDrive = (() => {
     if (cachedToken()) return true;
     if (!interactive) return false;
     const clientId = getClientId();
-    if (!clientId) throw new Error('Не задан Google Client ID — см. раздел «Google Drive» в настройках');
+    if (!clientId) throw new Error(_t('Не задан Google Client ID — см. раздел «Google Drive» в настройках'));
     await preload();
     return new Promise((resolve, reject) => {
       const client = google.accounts.oauth2.initTokenClient({
@@ -63,7 +63,7 @@ window.GDrive = (() => {
           resolve(true);
         },
         error_callback: e => reject(Object.assign(
-          new Error(e?.type === 'popup_closed' ? 'Окно входа закрыто' : e?.type === 'popup_failed_to_open' ? 'Браузер заблокировал окно входа Google' : (e?.message || 'Вход не выполнен')),
+          new Error(e?.type === 'popup_closed' ? _t('Окно входа закрыто') : e?.type === 'popup_failed_to_open' ? _t('Браузер заблокировал окно входа Google') : (e?.message || _t('Вход не выполнен'))),
           { name: e?.type === 'popup_closed' ? 'AbortError' : 'Error' })),
       });
       client.requestAccessToken({ prompt: '' });
@@ -180,7 +180,7 @@ window.GDrive = (() => {
       },
       async getPhoto(name) {
         const id = (await photoIds()).get(name);
-        if (!id) throw new Error('Фото не найдено');
+        if (!id) throw new Error(_t('Фото не найдено'));
         return (await api(`${API}/files/${id}?alt=media`)).blob();
       },
       async putPhoto(name, blob) {
