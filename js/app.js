@@ -10,7 +10,9 @@ const P0={id:'p2s',name:'Bambu Lab P2S',price:76990,years:5,annualHours:500,watt
 const normPrinter=p=>({id:String(p.id||shortId()),name:String(p.name||_t('Принтер')).trim()||_t('Принтер'),price:number(p.price),years:number(p.years)||5,annualHours:number(p.annualHours)||500,watts:number(p.watts),maintenance:number(p.maintenance),
   bambuDev:String(p.bambuDev||''),baseHours:number(p.baseHours),since:/^\d{4}-\d{2}-\d{2}$/.test(p.since||'')?p.since:'',
   maint:p.maint&&typeof p.maint==='object'?Object.fromEntries(Object.entries(p.maint).filter(([,l])=>Array.isArray(l)).map(([k,l])=>[k,l.filter(e=>e&&/^\d{4}-\d{2}-\d{2}$/.test(e.date)).map(e=>({date:e.date,hours:number(e.hours),grams:number(e.grams)}))])):{},
-  maintCfg:p.maintCfg&&typeof p.maintCfg==='object'?Object.fromEntries(Object.entries(p.maintCfg).map(([k,c])=>[k,{...(number(c?.every)?{every:number(c.every)}:{}),...(c?.off?{off:true}:{})}])):{}});
+  maintCfg:p.maintCfg&&typeof p.maintCfg==='object'?Object.fromEntries(Object.entries(p.maintCfg).map(([k,c])=>[k,{...(number(c?.every)?{every:number(c.every)}:{}),...(c?.off?{off:true}:{})}])):{},
+  // привязка слотов AMS к катушкам склада (для катушек без RFID): {номер слота: {spool, type, color}}
+  amsSlots:p.amsSlots&&typeof p.amsSlots==='object'?Object.fromEntries(Object.entries(p.amsSlots).filter(([k,v])=>/^\d+$/.test(k)&&v?.spool).map(([k,v])=>[k,{spool:String(v.spool),type:String(v.type||''),color:String(v.color||'')}])):{}});
 const baseMaterials=[{id:'petg',name:'PETG',price:1000},{id:'pla',name:'PLA',price:1000},{id:'abs',name:'ABS',price:1200}];
 
 const money=n=>new Intl.NumberFormat(I18N.loc,{style:'currency',currency:'RUB',currencyDisplay:'narrowSymbol'}).format(n);
@@ -546,7 +548,7 @@ function guessDensity(name){const n=String(name).toUpperCase();for(const k of Ob
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 function normSpool(s){return{id:String(s.id||uid()),materialId:String(s.materialId||''),brand:String(s.brand||''),series:String(s.series||''),color:String(s.color||''),colorHex:/^#[0-9a-f]{6}$/i.test(s.colorHex)?s.colorHex:'#d9dee8',colorStops:(Array.isArray(s.colorStops)?s.colorStops:[]).filter(v=>/^#[0-9a-f]{6}$/i.test(v)).slice(0,8),
   diameter:number(s.diameter)||1.75,net:number(s.net)||1000,empty:s.empty===''||s.empty==null?'':number(s.empty),price:number(s.price),purchased:String(s.purchased||''),store:String(s.store||''),
-  status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),bambu:String(s.bambu||''),createdAt:s.createdAt||now(),rating:Math.max(0,Math.min(5,Math.round(number(s.rating)))),rtags:(Array.isArray(s.rtags)?s.rtags:[]).filter(t=>RTAGS[t]),review:String(s.review||''),
+  status:SPOOL_ST[s.status]?s.status:'sealed',opened:String(s.opened||''),dried:String(s.dried||''),notes:String(s.notes||''),bambu:String(s.bambu||''),rfid:/^[0-9A-F]{8,64}$/.test(s.rfid||'')?s.rfid:'',createdAt:s.createdAt||now(),rating:Math.max(0,Math.min(5,Math.round(number(s.rating)))),rtags:(Array.isArray(s.rtags)?s.rtags:[]).filter(t=>RTAGS[t]),review:String(s.review||''),
   ops:(Array.isArray(s.ops)?s.ops:[]).filter(o=>OPNAMES[o?.type]).map(o=>({id:String(o.id||shortId()),at:o.at||now(),date:String(o.date||String(o.at||now()).slice(0,10)),type:o.type,grams:number(o.grams),note:String(o.note||'')}))}}
 const normUsage=p=>(Array.isArray(p.usage)?p.usage:[]).map(u=>({label:String(u.label||''),materialId:String(u.materialId||''),spoolId:String(u.spoolId||''),grams:number(u.grams)}));
 const printBase=p=>({id:String(p.id||uid()),at:p.at||now(),date:String(p.date||String(p.at||now()).slice(0,10)),printerId:String(p.printerId||''),hours:p.hours==null||p.hours===''?null:number(p.hours),result:p.result==='fail'?'fail':'ok',note:String(p.note||''),src:String(p.src||''),plate:String(p.plate||''),cover:/^https:\/\//.test(p.cover||'')?String(p.cover):'',usage:normUsage(p)});
@@ -1486,7 +1488,7 @@ function renderPrinterPage(){const P=curPrinter();prId=P.id;const U=printerUsage
       [_t('Прошивка'),v?`${escape(v.version||'—')}${v.update?` → <b>${_t("доступна")} ${escape(v.update.version)}</b>${v.update.force?_t(' (обязательная)'):''}`:_t(' · последняя')}`:'—'],
       [_t('Новых заданий в облаке'),cloud.newTasks==null?'—':cloud.newTasks?`${cloud.newTasks} · <a class="lnk" href="#log" data-bbopen>${_t("импортировать →")}</a>`:_t('нет')]];
     cl=`<div class="breakdown" style="margin-top:0">${rows.map(([a,b])=>`<div class="line"><span>${a}</span><span style="text-align:right">${b}</span></div>`).join('')}</div>${v?.update?.description?`<details class="more"><summary>${_t("Что нового в")} ${escape(v.update.version)}</summary><div class="muted" style="white-space:pre-wrap">${escape(v.update.description.replace(/<[^>]+>/g,'')).slice(0,3000)}</div></details>`:''}${cp?.thumb?`<img class="prthumb" src="${escape(cp.thumb)}" alt="" referrerpolicy="no-referrer">`:''}`}
-  $('prCloud').innerHTML=(cloud.err&&BB.connected()?`<div class="notice" style="margin-bottom:10px">${escape(cloud.err)}</div>`:'')+cl;
+  $('prCloud').innerHTML=(cloud.err&&BB.connected()?`<div class="notice" style="margin-bottom:10px">${escape(cloud.err)}</div>`:'')+cl;renderAms();
   const next=M.filter(s=>s.st==='over'||s.st==='soon').sort((a,b)=>b.r-a.r);
   $('prNext').innerHTML=next.length?next.map(maintRowMini).join(''):_t('<p class="muted" style="margin:0">Все регламентные работы в норме.</p>');
   // Обслуживание
@@ -1524,7 +1526,46 @@ $('page-printer').addEventListener('click',e=>{const l=e.target.closest('[data-p
   if(e.target.closest('[data-bbopen]')){e.preventDefault();bbOpen()}
   const tg=e.target.closest('[data-tabgo]');if(tg)setPrTab(tg.dataset.tabgo)});
 function openPrinterPage(rest){const [id,tab]=String(rest||'').split('/');prId=db.printers.some(p=>p.id===id)?id:getPrinter('').id;show('printer');setPrTab(tab||'state',false);renderPrinterPage();
-  cloudRefresh().then(()=>{if(currentPage==='printer')renderPrinterPage()}).catch(()=>{})}
+  cloudRefresh().then(()=>{if(currentPage==='printer')renderPrinterPage()}).catch(()=>{});
+  const P=curPrinter();if(BB.connected()&&P.bambuDev&&!amsNow.has(P.id))amsRead(P)}
+
+/* --- «Сейчас в AMS»: живой отчёт принтера (облачный MQTT через Worker) и катушки склада --- */
+// Катушка Bambu Lab узнаётся по RFID (tray_uuid → spool.rfid). Сторонняя — по привязке слота
+// (printer.amsSlots), которая действует, пока в слоте те же тип и цвет.
+const amsNow=new Map(); // printerId → {loading, err, data}
+async function amsRead(P){const st={loading:true,data:amsNow.get(P.id)?.data};amsNow.set(P.id,st);renderAms();
+  try{st.data=await BB.ams(P.bambuDev)}catch(e){st.err=e.message}finally{st.loading=false}if(currentPage==='printer'&&curPrinter().id===P.id)renderAms()}
+const amsGrams=t=>t.remain!=null&&t.weight?Math.round(t.weight*t.remain/100):null;
+function amsCands(t){const mid=bbMatchMat(t.type);let l=db.spools.filter(s=>s.status!=='empty'&&(!mid||s.materialId===mid));if(!l.length)l=db.spools.filter(s=>s.status!=='empty');
+  const score=s=>Math.min(colDist(t.color,s.colorHex),...s.colorStops.map(c=>colDist(t.color,c)))+(t.uuid&&s.rfid&&s.rfid!==t.uuid?300:0)+(t.uuid&&!/bambu/i.test(s.brand)?25:0)+(t.name&&ieq(s.series,t.name)?-20:0)+(s.status==='open'?0:15);
+  return l.map(s=>[s,score(s)]).sort((a,b)=>a[1]-b[1])}
+function amsMatch(P,t){if(t.empty)return{};
+  if(t.uuid){const s=db.spools.find(s=>s.rfid===t.uuid);if(s)return{s,why:'rfid'}}
+  const b=P.amsSlots[t.gid],bs=b&&getSpool(b.spool);
+  if(bs&&b.type===t.type&&colDist(b.color,t.color)<=30)return{s:bs,why:'slot'};
+  const c=amsCands(t)[0];return{sug:c&&c[1]<=110?c[0]:null,changed:!!bs}}
+function amsBind(P,t,id){const s=id&&getSpool(id);
+  if(t.uuid){for(const x of db.spools)if(x.rfid===t.uuid&&x.id!==id)x.rfid='';if(s)s.rfid=t.uuid}
+  if(s){P.amsSlots[t.gid]={spool:s.id,type:t.type,color:t.color};if(s.status==='sealed'){s.status='open';if(!s.opened)s.opened=today()}}else delete P.amsSlots[t.gid];
+  persist();renderAms();setStatus(s?`${t.label} → ${spName(s)}`:`${t.label}: ${_t("привязка снята")}`)}
+function renderAms(){const P=curPrinter(),box=$('prAms');$('prAmsPanel').hidden=!BB.connected()||!P.bambuDev;if($('prAmsPanel').hidden)return;
+  const st=amsNow.get(P.id),d=st?.data;$('prAmsRead').disabled=!!st?.loading;
+  let h=st?.err?`<div class="notice" style="margin-bottom:10px">${escape(st.err)}</div>`:'';
+  if(!d){box.innerHTML=h+`<p class="muted" style="margin:0">${st?.loading?_t('Читаю отчёт принтера… (до 10 секунд)'):_t('Нажмите «Прочитать AMS», чтобы узнать, какие катушки стоят в принтере.')}</p>`;return}
+  const rows=d.trays.map(t=>{const m=amsMatch(P,t),g=amsGrams(t),cur=m.s?.id||'';
+    const info=t.empty?_t('<span class="muted">пусто</span>'):[`<b>${escape(t.type)}</b>${t.name?' '+escape(t.name):''}`,t.uuid?_t('<span class="pill done">RFID</span>'):_t('<span class="pill sp-empty">без RFID</span>'),t.remain!=null&&t.uuid?`${_t("AMS")}: ${fmt(t.remain,0)}%${g!=null?` ≈ ${fmt(g,0)} ${_t("г")}`:''}`:''].filter(Boolean).join(' ');
+    let sp='';if(!t.empty){
+      const opts=amsCands(t).map(([s])=>`<option value="${escape(s.id)}"${s.id===cur?' selected':''}>${escape(spName(s))} · ${escape(getMat(s.materialId).name)} · ${fmt(spoolState(s).remaining,0)} ${_t("г")}</option>`).join('');
+      sp=`<div class="ams-sp">${m.s?`<a class="lnk" href="#spool/${escape(m.s.id)}">${swatch(m.s,'sm')} ${escape(spName(m.s))}</a> <small class="muted">${_t("по журналу")} ${fmt(spoolState(m.s).remaining,0)} ${_t("г")} · ${m.why==='rfid'?_t('узнана по RFID'):_t('привязана к слоту')}</small>`
+        :`<span class="muted">${m.changed?_t('В слоте другая катушка.'):_t('Не сопоставлена со складом.')}</span>${m.sug?` <button type="button" class="secondary small" data-amsbind="${escape(m.sug.id)}">${_t("Это")} «${escape(spName(m.sug))}»?</button>`:''}`}
+        <select data-amssel aria-label="${_t("Катушка со склада")}"><option value="">${m.s?_t('— снять привязку —'):_t('— выбрать катушку —')}</option>${opts}</select></div>`}
+    return`<div class="ams-row${t.active?' act':''}${t.empty?' vacant':''}" data-gid="${t.gid}"><span class="swatch${t.empty||!t.color?' empty':''}" style="${t.color?`background:${t.color}`:''}"></span>
+      <div><div class="ams-ttl"><span class="ams-lbl">${escape(t.label)}</span>${t.active?_t('<span class="pill wip">подаётся</span>'):''} ${info}</div>${sp}</div></div>`}).join('');
+  const hum=d.units.filter(u=>u.humidity||u.temp).map(u=>`AMS ${u.id>=128?'HT '+(u.id-127):u.id+1}: ${u.temp?fmt(u.temp,1)+' °C':''}${u.humidity?` · ${_t("влажность")} ${escape(u.humidity)}`:''}`).join(' · ');
+  box.innerHTML=h+(d.trays.length?`<div class="ams-list">${rows}</div>`:_t('<p class="muted">Принтер не сообщил о слотах AMS.</p>'))+`<p class="muted top" style="margin-bottom:0">${_t("Обновлено")} ${new Date(d.at).toLocaleTimeString(I18N.loc)}${d.full?'':_t(' · отчёт неполный (принтер прислал только изменения)')}${hum?' · '+hum:''}</p>`}
+$('prAmsRead').onclick=()=>{const P=curPrinter();if(P.bambuDev)amsRead(P)};
+$('prAms').addEventListener('click',e=>{const b=e.target.closest('[data-amsbind]');if(!b)return;const P=curPrinter(),gid=+b.closest('[data-gid]').dataset.gid,t=amsNow.get(P.id)?.data?.trays.find(x=>x.gid===gid);if(t)amsBind(P,t,b.dataset.amsbind)});
+$('prAms').addEventListener('change',e=>{if(!e.target.matches('[data-amssel]'))return;const P=curPrinter(),gid=+e.target.closest('[data-gid]').dataset.gid,t=amsNow.get(P.id)?.data?.trays.find(x=>x.gid===gid);if(t)amsBind(P,t,e.target.value)});
 
 /* --- карточка принтера на главной --- */
 function renderDashPrinter(){const list=db.printers.filter(P=>P.id===getPrinter('').id||printerUsage(P).ev.length);

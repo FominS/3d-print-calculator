@@ -195,8 +195,41 @@ window.Bambu = (() => {
     });
   }
 
+  /* Что сейчас стоит в AMS — по живому отчёту принтера (облачный MQTT через Worker, маршрут /ams).
+   * uuid — уникальный номер RFID-катушки Bambu Lab (у сторонних катушек его нет: null).
+   * Тип и цвет сторонней катушки — те, что заданы вручную на принтере или в слайсере. */
+  async function ams(devId, { raw = false } = {}) {
+    const d = await call('/ams?' + new URLSearchParams({ dev: devId, ...(raw ? { raw: '1' } : {}) }));
+    const A = d.ams || {}, now = Number(A.tray_now);
+    const zero = v => !v || /^0+$/.test(String(v));
+    const hex = v => /^[0-9a-f]{6}/i.test(v || '') ? '#' + String(v).slice(0, 6).toLowerCase() : '';
+    const tray = (t, unit, gid, label) => {
+      const empty = !t || !t.tray_type;
+      const remain = Number(t?.remain);
+      return {
+        gid, label, unit, empty, active: now === gid,
+        uuid: zero(t?.tray_uuid) ? null : String(t.tray_uuid).toUpperCase(),
+        tag: zero(t?.tag_uid) ? null : String(t.tag_uid).toUpperCase(),
+        type: String(t?.tray_type || ''), name: String(t?.tray_sub_brands || ''), idx: String(t?.tray_info_idx || ''),
+        color: hex(t?.tray_color), cols: (Array.isArray(t?.cols) ? t.cols : []).map(hex).filter(Boolean),
+        remain: Number.isFinite(remain) && remain >= 0 ? remain : null, // %, у сторонних катушек обычно нет
+        weight: Number(t?.tray_weight) || 0, diameter: Number(t?.tray_diameter) || 0,
+      };
+    };
+    const units = (Array.isArray(A.ams) ? A.ams : []).map(u => {
+      const id = Number(u.id) || 0, ht = id >= 128; // AMS HT: id 128…135, один слот
+      const trays = (Array.isArray(u.tray) ? u.tray : []).map(t => {
+        const slot = Number(t.id) || 0, gid = ht ? id : id * 4 + slot;
+        return tray(t, id, gid, ht ? `AMS HT ${id - 127}` : `AMS ${id + 1}-${slot + 1}`);
+      }).sort((a, b) => a.gid - b.gid);
+      return { id, humidity: u.humidity != null ? String(u.humidity) : '', temp: Number(u.temp) || null, trays };
+    });
+    const ext = d.vt_tray ? tray(d.vt_tray, 255, 254, _t('Внешняя катушка')) : null;
+    return { at: d.at, full: !!d.full, units, ext, trays: [...units.flatMap(u => u.trays), ...(ext ? [ext] : [])], raw: d.raw };
+  }
+
   return {
     state, patch, proxy, region, connected, expired,
-    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments, deviceVersion, currentPrint, image,
+    login, sendCode, loginCode, setToken, logout, devices, tasks, filaments, deviceVersion, currentPrint, image, ams,
   };
 })();
