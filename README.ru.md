@@ -171,6 +171,12 @@ python -m http.server 8000
 
 Затем откройте http://localhost:8000. Публикация на GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.
 
+### Демо-режим
+
+Откройте http://localhost:8000/?demo — приложение запустится на фейковой мастерской, которая показывает все экраны: три принтера с просроченным и предстоящим обслуживанием, катушки во всех состояниях, сборка с вложенными изделиями, прототипы, неудачные печати, столы из нескольких изделий и фейковый Bambu Lab Cloud (живой AMS, история печати, обновление прошивки). Даты считаются от сегодняшнего дня.
+
+Демо-режим работает в отдельной «песочнице» браузера и не трогает ваши настоящие данные; подключение папки и Google Drive в нём отключено. Изменения сохраняются между перезагрузками, `?demo=reset` создаёт данные заново. Подробнее: [mock/README.md](mock/README.md).
+
 ## Структура проекта
 
 ```
@@ -181,6 +187,7 @@ js/gdrive.js               хранилище Google Drive
 js/bambu.js                Bambu Lab Cloud: вход и история печати
 worker/bambu-proxy.js      Cloudflare Worker: CORS-прокси к Bambu Cloud
 js/app.js                  приложение
+mock/                      демо-данные и фейковый Bambu Cloud (index.html?demo)
 docs/google-drive-setup.md инструкция по подключению Google Drive
 docs/bambu-cloud-setup.md  инструкция по импорту из Bambu Lab Cloud
 manifest.webmanifest       установка как приложения

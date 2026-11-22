@@ -169,6 +169,12 @@ python -m http.server 8000
 
 Then open http://localhost:8000. GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.
 
+### Demo mode
+
+Open http://localhost:8000/?demo to run the app on a fake workshop that exercises every screen: three printers with overdue and upcoming maintenance, spools in all states, an assembly with nested items, prototypes, failed prints, multi-item plates, and a fake Bambu Lab Cloud (live AMS, print history, firmware update). Dates are relative to today.
+
+Demo mode works in a separate browser sandbox and never touches your real data; folder and Google Drive storage are disabled there. Changes persist between reloads; `?demo=reset` recreates the data. Details: [mock/README.md](mock/README.md).
+
 ## Project structure
 
 ```
@@ -179,6 +185,7 @@ js/gdrive.js               Google Drive storage
 js/bambu.js                Bambu Lab Cloud: sign-in and print history
 worker/bambu-proxy.js      Cloudflare Worker: CORS proxy to Bambu Cloud
 js/app.js                  application
+mock/                      demo data and fake Bambu Cloud (index.html?demo)
 docs/google-drive-setup.md Google Drive setup guide (RU)
 docs/bambu-cloud-setup.md  Bambu Lab Cloud import guide (RU)
 manifest.webmanifest       install as an app
