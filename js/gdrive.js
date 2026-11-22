@@ -1,5 +1,6 @@
 /*
- * Хранилище Google Drive для 3D Print Calculator.
+ * Хранилище Google Drive для PrintBench.
+ * Папка в Drive по-прежнему называется «3D Print Calculator» — так сохраняется доступ к уже записанным данным.
  * Вход — Google Identity Services (token model), данные — Drive REST API v3.
  * Область доступа drive.file: приложение видит только файлы, которые создало само,
  * остальной Google Drive ему недоступен.

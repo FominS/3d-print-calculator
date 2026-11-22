@@ -1,7 +1,7 @@
 {
-  "name": "3D Print Calculator",
-  "short_name": "3D Print",
-  "description": "Себестоимость 3D-печати, каталог изделий, катушки и журнал печати",
+  "name": "PrintBench — мастерская домашней 3D-печати",
+  "short_name": "PrintBench",
+  "description": "Калькулятор себестоимости 3D-печати, каталог изделий, катушки, журнал печати и обслуживание принтера",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

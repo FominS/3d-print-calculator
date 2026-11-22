@@ -1,8 +1,8 @@
-# 3D Print Calculator
+# PrintBench — your home 3D printing workbench
 
 **English** · [Русский](README.ru.md)
 
-A browser-based 3D printing cost calculator and print tracker for hobbyists. Calculate the real cost of a print, keep a catalog of your models, track filament spools and log every print. No backend and no account: your data stays in your browser, in a folder on your computer or in your own Google Drive.
+PrintBench (formerly 3D Print Calculator) is a browser-based workbench for hobby 3D printing: a print cost calculator, item catalog, filament spool inventory, print log and printer maintenance in one place. No backend and no account: your data stays in your browser, in a folder on your computer or in your own Google Drive.
 
 **Live:** https://fomins.github.io/3d-print-calculator/
 
@@ -85,7 +85,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 |---|---|---|---|
 | Browser | IndexedDB of the current browser | this browser only | — |
 | Folder | `3d-print-data.json`, `photos/`, `backups/` in a folder you pick | Chrome / Edge on desktop | ✓ |
-| Google Drive | `3D Print Calculator/` folder in your Drive | any browser, including phones | ✓ |
+| Google Drive | `3D Print Calculator/` folder in your Drive (the folder keeps its original name) | any browser, including phones | ✓ |
 
 - The browser copy is always kept. The chosen storage is saved automatically, or manually with `Ctrl+S`.
 - Before overwriting a data file, the previous version goes to `backups/`.

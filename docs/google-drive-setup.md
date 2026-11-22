@@ -10,7 +10,7 @@
 
 1. Откройте https://console.cloud.google.com.
 2. Вверху слева, рядом с логотипом Google Cloud, — выпадающий список проектов. Нажмите на него → **New project** (Новый проект).
-3. Project name: `3D Print Calculator`. Organization/Location оставьте как есть («No organization»).
+3. Project name: `PrintBench`. Organization/Location оставьте как есть («No organization»).
 4. **Create**. Подождите 10–20 секунд, затем в том же списке вверху **выберите созданный проект**: проверьте, что его имя показано вверху страницы. Все следующие шаги делаются внутри него.
 
 ## Шаг 2. Включить Google Drive API
@@ -27,7 +27,7 @@
    или поиск вверху: `Google Auth Platform`.
 2. Если видите «Google Auth Platform not configured yet» — нажмите **Get started**. Откроется мастер из 4 шагов:
    1. **App Information**
-      - App name: `3D Print Calculator`
+      - App name: `PrintBench`
       - User support email: выберите свой email из списка
       - **Next**
    2. **Audience** — выберите **External** (Внешний). *Internal* доступен только для организаций Google Workspace.

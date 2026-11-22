@@ -1,5 +1,5 @@
 /*
- * Bambu Lab Cloud для 3D Print Calculator: вход и загрузка истории печати.
+ * Bambu Lab Cloud для PrintBench: вход и загрузка истории печати.
  *
  * Браузер не может обращаться к api.bambulab.com напрямую (нет CORS), поэтому все
  * запросы идут через ваш Cloudflare Worker (worker/bambu-proxy.js) — его адрес

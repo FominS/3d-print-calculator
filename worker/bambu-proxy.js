@@ -1,5 +1,5 @@
 /*
- * Cloudflare Worker: CORS-прокси к Bambu Lab Cloud API для 3D Print Calculator.
+ * Cloudflare Worker: CORS-прокси к Bambu Lab Cloud API для PrintBench.
  *
  * Зачем: api.bambulab.com не отдаёт CORS-заголовки, поэтому сайт на GitHub Pages
  * не может обращаться к нему из браузера напрямую. Worker пересылает запросы
@@ -55,7 +55,7 @@ async function image(u, h) {
   try { t = new URL(u); } catch { return json(400, { error: 'bad url' }, h); }
   if (t.protocol !== 'https:' || !IMG_HOST.test(t.hostname)) return json(403, { error: 'host not allowed' }, h);
   let res;
-  try { res = await fetch(t.toString(), { headers: { 'User-Agent': '3d-print-calculator-proxy/1.0' }, redirect: 'follow' }); }
+  try { res = await fetch(t.toString(), { headers: { 'User-Agent': 'printbench-proxy/1.0' }, redirect: 'follow' }); }
   catch { return json(502, { error: 'upstream unreachable' }, h); }
   const ct = res.headers.get('Content-Type') || '';
   if (!res.ok || !/^image\//.test(ct)) return json(502, { error: 'not an image', status: res.status }, h);
@@ -78,7 +78,7 @@ export default {
 
     const region = request.headers.get('X-Bambu-Region') === 'cn' ? 'cn' : 'global';
     const target = HOSTS[region] + url.pathname + url.search;
-    const headers = new Headers({ 'Accept': 'application/json', 'User-Agent': '3d-print-calculator-proxy/1.0' });
+    const headers = new Headers({ 'Accept': 'application/json', 'User-Agent': 'printbench-proxy/1.0' });
     const auth = request.headers.get('Authorization');
     if (auth) headers.set('Authorization', auth);
     const init = { method, headers, redirect: 'manual' };
