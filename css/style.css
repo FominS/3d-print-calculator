@@ -453,7 +453,7 @@ details.save-more{margin:0}details.save-more>summary{font-size:15px;color:var(--
 .rtag.on.neg{background:color-mix(in srgb,var(--neg) 16%,var(--panel));border-color:var(--neg);color:var(--text)}
 .rtag.sm{cursor:default;padding:2px 8px;font-size:11.5px;display:inline-block;margin:1px 0}.rtag.sm.pos{border-color:color-mix(in srgb,var(--pos) 60%,var(--panel-line))}.rtag.sm.neg{border-color:color-mix(in srgb,var(--neg) 60%,var(--panel-line))}
 /* редактирование записи журнала */
-.pehead{grid-template-columns:150px 110px 1fr 1fr!important;margin-top:12px}.pehead .wide{grid-column:1/-1}
+.pehead{grid-template-columns:150px 1fr 1fr!important;margin-top:12px}.pehead .wide{grid-column:1/-1}
 .perow{grid-template-columns:1fr 1.3fr 150px}.perow .inl .iconbtn{margin-left:auto}
 @media(max-width:800px){.pehead{grid-template-columns:1fr 1fr!important}.perow{grid-template-columns:1fr 1fr}.perow>select:first-child{grid-column:1/-1}}
 /* вложенность изделий */
@@ -500,3 +500,16 @@ a.kid{color:var(--text);text-decoration:none}a.kid:hover b{color:var(--link)}
 .profrow input{margin-top:4px}
 .pfscope{margin-top:10px}
 .langbtn{font-size:12px;font-weight:700;letter-spacing:.3px}
+/* Прототипы и стол из нескольких элементов */
+.pill.proto{background:var(--idea-bg);color:var(--idea-fg)}
+.tl-item.is-proto{border-left:3px solid var(--idea-fg);padding-left:9px}
+.tl-lines{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:12.5px}
+.tl-line{display:inline-flex;gap:6px;align-items:center;padding:3px 9px;border:1px solid var(--line);border-radius:8px;background:var(--sub)}
+.tl-line.cur{border-color:var(--accent)}.tl-line.bad{opacity:.75}.tl-line a{font-size:12.5px!important}
+.pfpurpose{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}.pfpurpose .inl{display:flex;align-items:center;gap:6px;font-size:13px}.pfpurpose input{width:120px;margin:0}
+.pfline,.peline{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:8px}
+.pfline select,.peline select{flex:1 1 220px;min-width:0;margin:0}.peline>input[data-pl="name"]{flex:1 1 180px;margin:0}
+.pfline .inl,.peline .inl{display:flex;align-items:center;gap:4px;font-size:13px}.pfline .inl input,.peline .inl input{width:64px;margin:0}
+.pfline label.check,.peline label.check,.bb-proto{margin-top:0}.peline input.ver{width:110px;margin:0}
+.itlogseg{margin:0 0 12px}.protosum{margin:0 0 12px}
+.tl-line>span{white-space:nowrap}

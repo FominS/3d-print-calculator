@@ -32,7 +32,8 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - Links with one-click presets for MakerWorld, Thingiverse and Printables. Titles are detected from the URL.
 - **Print**: quantity, time per piece and several filaments (AMS multicolor) — one such profile per item.
 - **Parts are nested items.** An assembly part is a separate item with its own filaments, time, photos and log. “+ Part” in the Composition block creates a nested item. Any depth, no cycles.
-- **Prototypes**: version, date, filament, spool, time and a "what changed" note.
+- **Prototypes are a flag on a print.** Any log entry can be marked “⚗ Prototype” (with a version: v1, v2…) or set back to “◈ To item”. Prototypes are counted separately as development cost and are not included in the item cost or printed sets. The Print log tab has an All / To item / Prototypes filter.
+- **Several parts on one plate** are one log entry with rows: “+ Another part on the plate” in the print form or “+ Part on the plate” in ✎ Edit. Each row has its own quantity, prototype flag and defect flag (the part failed). The plate cost is split by the parts’ planned weight, or by a manual % share.
 - Print settings, photos (stored in the selected storage, resized to 1600 px) and a cover image.
 - **MakerWorld description generator** (RU/EN) built from the item, its parts and print settings, in a separate dialog.
 - **“⇄ Structure” mode** on the Items page moves items in the hierarchy, like Confluence's “view in hierarchy”: drag a row onto another item or use “⇄ Move” → “↳ Here”; “⇤” moves one level up. Changes apply on Save, and Cancel restores everything. From the item page: ⋯ → Move in hierarchy.
@@ -66,7 +67,7 @@ Interface language: Russian. Built around a Bambu Lab P2S Combo, works with any 
 - **Spool sync with Bambu Cloud** (Spools → ⇣ Sync with Bambu Cloud): remaining weight of Bambu Lab RFID spools as reported by the AMS is recorded as a "set remaining" entry, and missing spools are created automatically.
 
 ### Printer
-- Runtime from the print log and prototypes (plus hours before tracking), daily load, success rate, depreciation resource, monthly stats.
+- Runtime from the print log, prototypes included (plus hours before tracking), daily load, success rate, depreciation resource, monthly stats.
 - **P2S maintenance schedule** based on Bambu Lab recommendations: X/Y/Z lubrication with usage-based intervals, idler pulleys, air filter, filament cutter, camera and on-condition tasks. Mark tasks done, set custom intervals, see warnings on the dashboard and in the menu.
 - From Bambu Cloud: online status, current print, firmware and available updates, tasks not yet imported.
 
