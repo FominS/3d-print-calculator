@@ -262,7 +262,7 @@ async function removePhotoFiles(files){if(!store||!stReady)return;for(const f of
 /* ================= Тема ================= */
 const THEME_KEY='p2s_theme',mq=matchMedia('(prefers-color-scheme: light)');
 function themeMode(){try{return localStorage.getItem(THEME_KEY)||'auto'}catch{return'auto'}}
-function applyTheme(){const m=themeMode(),t=m==='auto'?(mq.matches?'light':'dark'):m;document.documentElement.dataset.theme=t;document.querySelector('meta[name=theme-color]')?.setAttribute('content',t==='light'?'#ffffff':'#121b30');$('themeBtn').textContent=t==='light'?'☾':'☀';$('themeBtn').title=t==='light'?_t('Тёмная тема'):_t('Светлая тема');$('themeSel').value=m}
+function applyTheme(){const m=themeMode(),t=m==='auto'?(mq.matches?'light':'dark'):m;document.documentElement.dataset.theme=t;document.querySelector('meta[name=theme-color]')?.setAttribute('content',t==='light'?'#ffffff':'#11161d');$('themeBtn').textContent=t==='light'?'☾':'☀';$('themeBtn').title=t==='light'?_t('Тёмная тема'):_t('Светлая тема');$('themeSel').value=m}
 function setTheme(m,save=true){try{localStorage.setItem(THEME_KEY,m)}catch{}applyTheme();if(save&&db&&db.settings.theme!==m){db.settings.theme=m;persist()}}
 mq.addEventListener?.('change',applyTheme);
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
