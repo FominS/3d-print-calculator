@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="27" fill="#161b22"/>
   <path d="M64 15 106 39v50l-42 24-42-24V39Z"
-        fill="none" stroke="#f1f3f5" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M35 73 64 57l29 16-29 16Z" fill="#f58a32"/>
-  <path d="M35 73 64 89l29-16v7L64 96 35 80Z" fill="#c95717"/>
-  <path d="M35 59 64 43l29 16-29 16Z" fill="#ff9a40"/>
-  <path d="M35 59 64 75l29-16v7L64 82 35 66Z" fill="#db651b"/>
-  <path d="M35 45 64 29l29 16-29 16Z" fill="#ffad52"/>
-  <path d="M35 45 64 61l29-16v7L64 68 35 52Z" fill="#ed7626"/>
+        fill="none" stroke="#e6edf3" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M35 73 64 57l29 16-29 16Z" fill="#2f6fe0"/>
+  <path d="M35 73 64 89l29-16v7L64 96 35 80Z" fill="#1a4ba8"/>
+  <path d="M35 59 64 43l29 16-29 16Z" fill="#4c8dff"/>
+  <path d="M35 59 64 75l29-16v7L64 82 35 66Z" fill="#225ec4"/>
+  <path d="M35 45 64 29l29 16-29 16Z" fill="#79b8ff"/>
+  <path d="M35 45 64 61l29-16v7L64 68 35 52Z" fill="#2f6fe0"/>
 </svg>
