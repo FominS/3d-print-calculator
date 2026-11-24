@@ -522,3 +522,19 @@ a.kid{color:var(--text);text-decoration:none}a.kid:hover b{color:var(--link)}
 .ams-lbl{font-weight:600;min-width:62px}
 .ams-sp{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px;font-size:13px}
 .ams-sp select{flex:1 1 220px;min-width:0;margin:0;padding:6px}
+
+/* ===== Упрощение интерфейса: меню «⋯» в строках, тихое удаление, вкладки настроек ===== */
+.rowmenu>summary{font-size:16px;padding:5px 10px;border-radius:8px}
+.rowmenu .menu-list{min-width:210px;text-align:left}
+.tl-acts{align-items:center}
+.tl-item[data-editrow]{cursor:pointer}
+.tl-item[data-editrow]:hover{border-color:var(--input-line)}
+td.rowacts{white-space:nowrap;text-align:right}
+td.rowacts>*{display:inline-block;vertical-align:middle;margin-left:4px}
+.iconbtn.quiet{background:transparent;color:var(--muted)}
+.iconbtn.quiet:hover{background:var(--hover);color:var(--neg)}
+body.one-printer .multi-pr{display:none}
+.undo-toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);z-index:60;display:flex;gap:14px;align-items:center;background:var(--panel);color:var(--text);border:1px solid var(--input-line);box-shadow:0 10px 30px var(--shadow);border-radius:12px;padding:10px 14px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
+.undo-toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.undo-toast .linkbtn{font-weight:650;white-space:nowrap;font-size:14px}
+@media(max-width:800px){.undo-toast{bottom:calc(84px + env(safe-area-inset-bottom))}}
